@@ -1,0 +1,79 @@
+{
+  "dashboard": {
+    "title": "MHRAS Compliance Dashboard",
+    "tags": ["mhras", "compliance", "audit"],
+    "timezone": "browser",
+    "panels": [
+      {
+        "id": 1,
+        "title": "Total Screenings",
+        "type": "stat",
+        "targets": [
+          {
+            "expr": "sum(increase(mhras_screenings_total[24h]))"
+          }
+        ],
+        "gridPos": {"h": 4, "w": 6, "x": 0, "y": 0}
+      },
+      {
+        "id": 2,
+        "title": "Human Reviews Completed",
+        "type": "stat",
+        "targets": [
+          {
+            "expr": "sum(increase(mhras_human_review_completed_total[24h]))"
+          }
+        ],
+        "gridPos": {"h": 4, "w": 6, "x": 6, "y": 0}
+      },
+      {
+        "id": 3,
+        "title": "Crisis Overrides",
+        "type": "stat",
+        "targets": [
+          {
+            "expr": "sum(increase(mhras_crisis_override_total[24h]))"
+          }
+        ],
+        "gridPos": {"h": 4, "w": 6, "x": 12, "y": 0}
+      },
+      {
+        "id": 4,
+        "title": "Consent Violations",
+        "type": "stat",
+        "targets": [
+          {
+            "expr": "sum(increase(mhras_errors_total{error_type=\"ConsentError\"}[24h]))"
+          }
+        ],
+        "gridPos": {"h": 4, "w": 6, "x": 18, "y": 0}
+      },
+      {
+        "id": 5,
+        "title": "Audit Events Over Time",
+        "type": "graph",
+        "targets": [
+          {
+            "expr": "rate(mhras_audit_events_total[5m])",
+            "legendFormat": "{{event_type}}"
+          }
+        ],
+        "gridPos": {"h": 8, "w": 24, "x": 0, "y": 4}
+      },
+      {
+        "id": 6,
+        "title": "Error Distribution",
+        "type": "piechart",
+        "targets": [
+          {
+            "expr": "sum(increase(mhras_errors_total[24h])) by (error_type)",
+            "legendFormat": "{{error_type}}"
+          }
+        ],
+        "gridPos": {"h": 8, "w": 12, "x": 0, "y": 12}
+      }
+    ],
+    "refresh": "1m",
+    "time": {"from": "now-24h", "to": "now"}
+  }
+}

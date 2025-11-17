@@ -1,0 +1,279 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "EMR Data Schema",
+  "description": "Schema for Electronic Medical Records data",
+  "type": "object",
+  "required": ["record_id", "timestamp", "record_type"],
+  "properties": {
+    "record_id": {
+      "type": "string",
+      "description": "Unique identifier for the medical record",
+      "pattern": "^[a-zA-Z0-9_-]+$"
+    },
+    "timestamp": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Timestamp of the record"
+    },
+    "record_type": {
+      "type": "string",
+      "enum": ["diagnosis", "medication", "encounter", "lab_result", "assessment"],
+      "description": "Type of medical record"
+    },
+    "diagnoses": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["code", "description"],
+        "properties": {
+          "code": {
+            "type": "string",
+            "description": "ICD-10 or DSM-5 diagnosis code",
+            "pattern": "^[A-Z0-9.]+$"
+          },
+          "description": {
+            "type": "string",
+            "maxLength": 500,
+            "description": "Diagnosis description"
+          },
+          "date_diagnosed": {
+            "type": "string",
+            "format": "date",
+            "description": "Date of diagnosis"
+          },
+          "status": {
+            "type": "string",
+            "enum": ["active", "resolved", "in_remission", "chronic"],
+            "description": "Current status of diagnosis"
+          },
+          "severity": {
+            "type": "string",
+            "enum": ["mild", "moderate", "severe"],
+            "description": "Severity level"
+          }
+        }
+      },
+      "description": "List of diagnoses"
+    },
+    "medications": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["name", "status"],
+        "properties": {
+          "name": {
+            "type": "string",
+            "maxLength": 200,
+            "description": "Medication name"
+          },
+          "dosage": {
+            "type": "string",
+            "maxLength": 100,
+            "description": "Dosage information"
+          },
+          "frequency": {
+            "type": "string",
+            "maxLength": 100,
+            "description": "Frequency of administration"
+          },
+          "start_date": {
+            "type": "string",
+            "format": "date",
+            "description": "Medication start date"
+          },
+          "end_date": {
+            "type": "string",
+            "format": "date",
+            "description": "Medication end date"
+          },
+          "status": {
+            "type": "string",
+            "enum": ["active", "discontinued", "completed", "on_hold"],
+            "description": "Medication status"
+          },
+          "prescriber": {
+            "type": "string",
+            "maxLength": 200,
+            "description": "Prescribing provider"
+          }
+        }
+      },
+      "description": "List of medications"
+    },
+    "encounters": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["date", "type"],
+        "properties": {
+          "date": {
+            "type": "string",
+            "format": "date-time",
+            "description": "Encounter date and time"
+          },
+          "type": {
+            "type": "string",
+            "enum": ["inpatient", "outpatient", "emergency", "telehealth", "therapy_session"],
+            "description": "Type of encounter"
+          },
+          "provider_type": {
+            "type": "string",
+            "enum": ["psychiatrist", "psychologist", "therapist", "primary_care", "emergency", "other"],
+            "description": "Type of healthcare provider"
+          },
+          "duration_minutes": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 1440,
+            "description": "Duration of encounter in minutes"
+          },
+          "chief_complaint": {
+            "type": "string",
+            "maxLength": 500,
+            "description": "Chief complaint or reason for visit"
+          },
+          "disposition": {
+            "type": "string",
+            "enum": ["discharged", "admitted", "referred", "follow_up_scheduled", "other"],
+            "description": "Encounter disposition"
+          }
+        }
+      },
+      "description": "List of clinical encounters"
+    },
+    "assessments": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["date", "type"],
+        "properties": {
+          "date": {
+            "type": "string",
+            "format": "date",
+            "description": "Assessment date"
+          },
+          "type": {
+            "type": "string",
+            "enum": ["mental_status", "suicide_risk", "functional", "cognitive", "other"],
+            "description": "Type of assessment"
+          },
+          "score": {
+            "type": "number",
+            "description": "Numerical assessment score"
+          },
+          "interpretation": {
+            "type": "string",
+            "enum": ["normal", "mild", "moderate", "severe", "critical"],
+            "description": "Clinical interpretation"
+          },
+          "notes": {
+            "type": "string",
+            "maxLength": 2000,
+            "description": "Assessment notes"
+          }
+        }
+      },
+      "description": "Clinical assessments"
+    },
+    "lab_results": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["test_name", "date"],
+        "properties": {
+          "test_name": {
+            "type": "string",
+            "maxLength": 200,
+            "description": "Name of laboratory test"
+          },
+          "date": {
+            "type": "string",
+            "format": "date",
+            "description": "Test date"
+          },
+          "value": {
+            "type": "number",
+            "description": "Test result value"
+          },
+          "unit": {
+            "type": "string",
+            "maxLength": 50,
+            "description": "Unit of measurement"
+          },
+          "reference_range": {
+            "type": "string",
+            "maxLength": 100,
+            "description": "Normal reference range"
+          },
+          "abnormal_flag": {
+            "type": "boolean",
+            "description": "Whether result is abnormal"
+          }
+        }
+      },
+      "description": "Laboratory test results"
+    },
+    "hospitalizations": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["admission_date"],
+        "properties": {
+          "admission_date": {
+            "type": "string",
+            "format": "date-time",
+            "description": "Hospital admission date"
+          },
+          "discharge_date": {
+            "type": "string",
+            "format": "date-time",
+            "description": "Hospital discharge date"
+          },
+          "reason": {
+            "type": "string",
+            "maxLength": 500,
+            "description": "Reason for hospitalization"
+          },
+          "facility_type": {
+            "type": "string",
+            "enum": ["psychiatric", "general_medical", "emergency", "other"],
+            "description": "Type of facility"
+          },
+          "involuntary": {
+            "type": "boolean",
+            "description": "Whether admission was involuntary"
+          }
+        }
+      },
+      "description": "Hospitalization history"
+    },
+    "risk_factors": {
+      "type": "object",
+      "properties": {
+        "suicide_attempts": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Number of previous suicide attempts"
+        },
+        "self_harm_history": {
+          "type": "boolean",
+          "description": "History of self-harm"
+        },
+        "family_history_mental_illness": {
+          "type": "boolean",
+          "description": "Family history of mental illness"
+        },
+        "substance_abuse_history": {
+          "type": "boolean",
+          "description": "History of substance abuse"
+        },
+        "trauma_history": {
+          "type": "boolean",
+          "description": "History of trauma"
+        }
+      },
+      "description": "Mental health risk factors"
+    }
+  },
+  "additionalProperties": false
+}

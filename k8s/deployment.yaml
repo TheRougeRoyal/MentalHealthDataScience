@@ -1,0 +1,227 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: mhras-api
+  labels:
+    app: mhras
+    component: api
+spec:
+  replicas: 3
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 0
+  selector:
+    matchLabels:
+      app: mhras
+      component: api
+  template:
+    metadata:
+      labels:
+        app: mhras
+        component: api
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "8000"
+        prometheus.io/path: "/metrics"
+    spec:
+      serviceAccountName: mhras-api
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        fsGroup: 1000
+      containers:
+      - name: api
+        image: mhras-api:latest
+        imagePullPolicy: IfNotPresent
+        ports:
+        - name: http
+          containerPort: 8000
+          protocol: TCP
+        env:
+        - name: LOG_LEVEL
+          valueFrom:
+            configMapKeyRef:
+              name: mhras-config
+              key: log_level
+        - name: DB_HOST
+          valueFrom:
+            secretKeyRef:
+              name: mhras-secrets
+              key: db_host
+        - name: DB_PORT
+          valueFrom:
+            secretKeyRef:
+              name: mhras-secrets
+              key: db_port
+        - name: DB_NAME
+          valueFrom:
+            secretKeyRef:
+              name: mhras-secrets
+              key: db_name
+        - name: DB_USER
+          valueFrom:
+            secretKeyRef:
+              name: mhras-secrets
+              key: db_user
+        - name: DB_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: mhras-secrets
+              key: db_password
+        - name: JWT_SECRET_KEY
+          valueFrom:
+            secretKeyRef:
+              name: mhras-secrets
+              key: jwt_secret_key
+        - name: ANONYMIZATION_SALT
+          valueFrom:
+            secretKeyRef:
+              name: mhras-secrets
+              key: anonymization_salt
+        - name: MODEL_REGISTRY_PATH
+          value: "/app/models"
+        - name: PYTHONPATH
+          value: "/app"
+        - name: EXPERIMENT_STORAGE_BACKEND
+          valueFrom:
+            configMapKeyRef:
+              name: mhras-config
+              key: experiment_storage_backend
+        - name: EXPERIMENT_ARTIFACTS_PATH
+          valueFrom:
+            configMapKeyRef:
+              name: mhras-config
+              key: experiment_artifacts_path
+        - name: DATA_VERSION_STORAGE_PATH
+          valueFrom:
+            configMapKeyRef:
+              name: mhras-config
+              key: data_version_storage_path
+        - name: DATA_VERSION_COMPRESSION
+          valueFrom:
+            configMapKeyRef:
+              name: mhras-config
+              key: data_version_compression
+        - name: FEATURE_STORE_CACHE_BACKEND
+          valueFrom:
+            configMapKeyRef:
+              name: mhras-config
+              key: feature_store_cache_backend
+        - name: FEATURE_STORE_REDIS_URL
+          valueFrom:
+            configMapKeyRef:
+              name: mhras-config
+              key: feature_store_redis_url
+        - name: FEATURE_STORE_CACHE_TTL
+          valueFrom:
+            configMapKeyRef:
+              name: mhras-config
+              key: feature_store_cache_ttl
+        resources:
+          requests:
+            memory: "2Gi"
+            cpu: "1000m"
+          limits:
+            memory: "4Gi"
+            cpu: "2000m"
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: http
+          initialDelaySeconds: 30
+          periodSeconds: 10
+          timeoutSeconds: 5
+          failureThreshold: 3
+        readinessProbe:
+          httpGet:
+            path: /health
+            port: http
+          initialDelaySeconds: 10
+          periodSeconds: 5
+          timeoutSeconds: 3
+          failureThreshold: 3
+        volumeMounts:
+        - name: models
+          mountPath: /app/models
+          readOnly: true
+        - name: logs
+          mountPath: /app/logs
+        - name: experiments
+          mountPath: /app/experiments
+        - name: datasets
+          mountPath: /app/data/versions
+      volumes:
+      - name: models
+        persistentVolumeClaim:
+          claimName: mhras-models-pvc
+      - name: logs
+        emptyDir: {}
+      - name: experiments
+        persistentVolumeClaim:
+          claimName: mhras-experiments-pvc
+      - name: datasets
+        persistentVolumeClaim:
+          claimName: mhras-datasets-pvc
+      affinity:
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+          - weight: 100
+            podAffinityTerm:
+              labelSelector:
+                matchExpressions:
+                - key: app
+                  operator: In
+                  values:
+                  - mhras
+              topologyKey: kubernetes.io/hostname
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: mhras-api
+  labels:
+    app: mhras
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: mhras-models-pvc
+  labels:
+    app: mhras
+spec:
+  accessModes:
+  - ReadOnlyMany
+  resources:
+    requests:
+      storage: 10Gi
+  storageClassName: standard
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: mhras-experiments-pvc
+  labels:
+    app: mhras
+spec:
+  accessModes:
+  - ReadWriteMany
+  resources:
+    requests:
+      storage: 50Gi
+  storageClassName: standard
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: mhras-datasets-pvc
+  labels:
+    app: mhras
+spec:
+  accessModes:
+  - ReadWriteMany
+  resources:
+    requests:
+      storage: 100Gi
+  storageClassName: standard

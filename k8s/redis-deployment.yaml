@@ -1,0 +1,97 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: mhras-redis
+  labels:
+    app: mhras
+    component: redis
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: mhras
+      component: redis
+  template:
+    metadata:
+      labels:
+        app: mhras
+        component: redis
+    spec:
+      containers:
+      - name: redis
+        image: redis:7-alpine
+        command:
+        - redis-server
+        - --appendonly
+        - "yes"
+        - --maxmemory
+        - "512mb"
+        - --maxmemory-policy
+        - allkeys-lru
+        ports:
+        - name: redis
+          containerPort: 6379
+          protocol: TCP
+        resources:
+          requests:
+            memory: "256Mi"
+            cpu: "100m"
+          limits:
+            memory: "512Mi"
+            cpu: "500m"
+        livenessProbe:
+          tcpSocket:
+            port: redis
+          initialDelaySeconds: 30
+          periodSeconds: 10
+          timeoutSeconds: 5
+          failureThreshold: 3
+        readinessProbe:
+          exec:
+            command:
+            - redis-cli
+            - ping
+          initialDelaySeconds: 5
+          periodSeconds: 5
+          timeoutSeconds: 3
+          failureThreshold: 3
+        volumeMounts:
+        - name: redis-data
+          mountPath: /data
+      volumes:
+      - name: redis-data
+        persistentVolumeClaim:
+          claimName: mhras-redis-pvc
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: mhras-redis
+  labels:
+    app: mhras
+    component: redis
+spec:
+  type: ClusterIP
+  ports:
+  - port: 6379
+    targetPort: redis
+    protocol: TCP
+    name: redis
+  selector:
+    app: mhras
+    component: redis
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: mhras-redis-pvc
+  labels:
+    app: mhras
+    component: redis
+spec:
+  accessModes:
+  - ReadWriteOnce
+  resources:
+    requests:
+      storage: 5Gi
+  storageClassName: standard

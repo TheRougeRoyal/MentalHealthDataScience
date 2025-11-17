@@ -1,0 +1,110 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Survey Data Schema",
+  "description": "Schema for mental health survey response data",
+  "type": "object",
+  "required": ["survey_id", "timestamp", "responses"],
+  "properties": {
+    "survey_id": {
+      "type": "string",
+      "description": "Unique identifier for the survey",
+      "pattern": "^[a-zA-Z0-9_-]+$"
+    },
+    "timestamp": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Timestamp when survey was completed"
+    },
+    "responses": {
+      "type": "object",
+      "description": "Survey question responses",
+      "properties": {
+        "mood_score": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 10,
+          "description": "Self-reported mood score (1-10)"
+        },
+        "anxiety_level": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 21,
+          "description": "GAD-7 anxiety score (0-21)"
+        },
+        "depression_level": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 27,
+          "description": "PHQ-9 depression score (0-27)"
+        },
+        "stress_level": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 10,
+          "description": "Self-reported stress level (1-10)"
+        },
+        "sleep_quality": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 5,
+          "description": "Sleep quality rating (1-5)"
+        },
+        "social_support": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 5,
+          "description": "Perceived social support (1-5)"
+        },
+        "suicidal_ideation": {
+          "type": "boolean",
+          "description": "Presence of suicidal thoughts"
+        },
+        "self_harm": {
+          "type": "boolean",
+          "description": "Recent self-harm behavior"
+        },
+        "substance_use": {
+          "type": "string",
+          "enum": ["none", "occasional", "frequent", "daily"],
+          "description": "Substance use frequency"
+        },
+        "medication_adherence": {
+          "type": "string",
+          "enum": ["none", "poor", "moderate", "good", "excellent"],
+          "description": "Medication adherence level"
+        },
+        "therapy_engagement": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 100,
+          "description": "Therapy engagement percentage"
+        },
+        "life_events": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "enum": ["loss", "trauma", "relationship_change", "job_change", "health_issue", "financial_stress", "other"]
+          },
+          "description": "Recent significant life events"
+        },
+        "free_text_response": {
+          "type": "string",
+          "maxLength": 5000,
+          "description": "Open-ended text response"
+        }
+      },
+      "additionalProperties": false
+    },
+    "completion_time_seconds": {
+      "type": "integer",
+      "minimum": 0,
+      "description": "Time taken to complete survey in seconds"
+    },
+    "device_type": {
+      "type": "string",
+      "enum": ["mobile", "tablet", "desktop", "other"],
+      "description": "Device used to complete survey"
+    }
+  },
+  "additionalProperties": false
+}

@@ -1,0 +1,85 @@
+{
+  "dashboard": {
+    "title": "MHRAS ML Dashboard",
+    "tags": ["mhras", "ml", "models"],
+    "timezone": "browser",
+    "panels": [
+      {
+        "id": 1,
+        "title": "Prediction Duration",
+        "type": "graph",
+        "targets": [
+          {
+            "expr": "histogram_quantile(0.95, rate(mhras_prediction_duration_seconds_bucket[5m]))",
+            "legendFormat": "p95"
+          },
+          {
+            "expr": "histogram_quantile(0.50, rate(mhras_prediction_duration_seconds_bucket[5m]))",
+            "legendFormat": "p50"
+          }
+        ],
+        "gridPos": {"h": 8, "w": 12, "x": 0, "y": 0}
+      },
+      {
+        "id": 2,
+        "title": "Model Inference Duration by Type",
+        "type": "graph",
+        "targets": [
+          {
+            "expr": "histogram_quantile(0.95, rate(mhras_model_inference_duration_seconds_bucket[5m]))",
+            "legendFormat": "{{model_type}}"
+          }
+        ],
+        "gridPos": {"h": 8, "w": 12, "x": 12, "y": 0}
+      },
+      {
+        "id": 3,
+        "title": "Drift Score by Feature",
+        "type": "graph",
+        "targets": [
+          {
+            "expr": "mhras_drift_score",
+            "legendFormat": "{{feature}}"
+          }
+        ],
+        "gridPos": {"h": 8, "w": 12, "x": 0, "y": 8}
+      },
+      {
+        "id": 4,
+        "title": "Screenings by Risk Level",
+        "type": "graph",
+        "targets": [
+          {
+            "expr": "rate(mhras_screenings_total[5m])",
+            "legendFormat": "{{risk_level}}"
+          }
+        ],
+        "gridPos": {"h": 8, "w": 12, "x": 12, "y": 8}
+      },
+      {
+        "id": 5,
+        "title": "Total Screenings (24h)",
+        "type": "stat",
+        "targets": [
+          {
+            "expr": "sum(increase(mhras_screenings_total[24h]))"
+          }
+        ],
+        "gridPos": {"h": 4, "w": 6, "x": 0, "y": 16}
+      },
+      {
+        "id": 6,
+        "title": "Critical Risk Rate",
+        "type": "gauge",
+        "targets": [
+          {
+            "expr": "rate(mhras_screenings_total{risk_level=\"critical\"}[1h]) / rate(mhras_screenings_total[1h])"
+          }
+        ],
+        "gridPos": {"h": 4, "w": 6, "x": 6, "y": 16}
+      }
+    ],
+    "refresh": "30s",
+    "time": {"from": "now-1h", "to": "now"}
+  }
+}

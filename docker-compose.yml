@@ -1,0 +1,120 @@
+version: '3.8'
+
+services:
+  # PostgreSQL Database
+  postgres:
+    image: postgres:15-alpine
+    container_name: mhras-postgres
+    environment:
+      POSTGRES_DB: mhras
+      POSTGRES_USER: mhras_user
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-mhras_dev_password_2024}
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U mhras_user -d mhras"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - mhras-network
+
+  # Redis for Feature Store Caching
+  redis:
+    image: redis:7-alpine
+    container_name: mhras-redis
+    command: redis-server --appendonly yes --maxmemory 512mb --maxmemory-policy allkeys-lru
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - mhras-network
+
+  # MHRAS API Service
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: mhras-api
+    environment:
+      # Database configuration
+      DB_HOST: postgres
+      DB_PORT: "5432"
+      DB_NAME: mhras
+      DB_USER: mhras_user
+      DB_PASSWORD: ${DB_PASSWORD:-mhras_dev_password_2024}
+      DB_POOL_SIZE: "10"
+      
+      # Redis configuration
+      FEATURE_STORE_REDIS_URL: redis://redis:6379
+      FEATURE_STORE_CACHE_BACKEND: redis
+      FEATURE_STORE_CACHE_TTL: 3600
+      
+      # Experiment tracking configuration
+      EXPERIMENT_STORAGE_BACKEND: filesystem
+      EXPERIMENT_ARTIFACTS_PATH: /app/experiments/artifacts
+      
+      # Data versioning configuration
+      DATA_VERSION_STORAGE_PATH: /app/data/versions
+      DATA_VERSION_COMPRESSION: gzip
+      DATA_VERSION_DEDUPLICATION: "true"
+      
+      # Security
+      JWT_SECRET_KEY: ${JWT_SECRET_KEY:-dev-secret-key-change-in-production}
+      ANONYMIZATION_SALT: ${ANONYMIZATION_SALT:-dev-salt-change-in-production}
+      
+      # Application settings
+      LOG_LEVEL: ${LOG_LEVEL:-INFO}
+      PYTHONPATH: /app
+      PYTHONUNBUFFERED: 1
+    ports:
+      - "8000:8000"
+    volumes:
+      # Application code (for development)
+      - ./src:/app/src
+      - ./config:/app/config
+      
+      # Persistent storage for experiments and datasets
+      - experiments_data:/app/experiments
+      - datasets_data:/app/data/versions
+      - models_data:/app/models
+      - logs_data:/app/logs
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    networks:
+      - mhras-network
+
+volumes:
+  postgres_data:
+    driver: local
+  redis_data:
+    driver: local
+  experiments_data:
+    driver: local
+  datasets_data:
+    driver: local
+  models_data:
+    driver: local
+  logs_data:
+    driver: local
+
+networks:
+  mhras-network:
+    driver: bridge

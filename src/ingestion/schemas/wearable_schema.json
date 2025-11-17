@@ -1,0 +1,233 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Wearable Data Schema",
+  "description": "Schema for wearable device health metrics",
+  "type": "object",
+  "required": ["device_id", "start_timestamp", "end_timestamp", "metrics"],
+  "properties": {
+    "device_id": {
+      "type": "string",
+      "description": "Unique identifier for the wearable device",
+      "pattern": "^[a-zA-Z0-9_-]+$"
+    },
+    "device_type": {
+      "type": "string",
+      "enum": ["smartwatch", "fitness_tracker", "smart_ring", "other"],
+      "description": "Type of wearable device"
+    },
+    "start_timestamp": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Start of data collection period"
+    },
+    "end_timestamp": {
+      "type": "string",
+      "format": "date-time",
+      "description": "End of data collection period"
+    },
+    "metrics": {
+      "type": "object",
+      "description": "Physiological metrics from wearable",
+      "properties": {
+        "heart_rate": {
+          "type": "object",
+          "properties": {
+            "average_bpm": {
+              "type": "number",
+              "minimum": 30,
+              "maximum": 220,
+              "description": "Average heart rate in beats per minute"
+            },
+            "resting_bpm": {
+              "type": "number",
+              "minimum": 30,
+              "maximum": 120,
+              "description": "Resting heart rate"
+            },
+            "max_bpm": {
+              "type": "number",
+              "minimum": 30,
+              "maximum": 220,
+              "description": "Maximum heart rate"
+            },
+            "min_bpm": {
+              "type": "number",
+              "minimum": 30,
+              "maximum": 220,
+              "description": "Minimum heart rate"
+            }
+          }
+        },
+        "hrv": {
+          "type": "object",
+          "description": "Heart rate variability metrics",
+          "properties": {
+            "rmssd": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 200,
+              "description": "Root mean square of successive differences (ms)"
+            },
+            "sdnn": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 300,
+              "description": "Standard deviation of NN intervals (ms)"
+            },
+            "lf_hf_ratio": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 10,
+              "description": "Low frequency to high frequency ratio"
+            }
+          }
+        },
+        "sleep": {
+          "type": "object",
+          "description": "Sleep metrics",
+          "properties": {
+            "total_minutes": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 1440,
+              "description": "Total sleep duration in minutes"
+            },
+            "deep_sleep_minutes": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 1440,
+              "description": "Deep sleep duration in minutes"
+            },
+            "rem_sleep_minutes": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 1440,
+              "description": "REM sleep duration in minutes"
+            },
+            "light_sleep_minutes": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 1440,
+              "description": "Light sleep duration in minutes"
+            },
+            "awake_minutes": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 1440,
+              "description": "Time awake during sleep period"
+            },
+            "interruptions": {
+              "type": "integer",
+              "minimum": 0,
+              "description": "Number of sleep interruptions"
+            },
+            "efficiency_percent": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 100,
+              "description": "Sleep efficiency percentage"
+            },
+            "bedtime": {
+              "type": "string",
+              "format": "date-time",
+              "description": "Bedtime timestamp"
+            },
+            "wake_time": {
+              "type": "string",
+              "format": "date-time",
+              "description": "Wake time timestamp"
+            }
+          }
+        },
+        "activity": {
+          "type": "object",
+          "description": "Physical activity metrics",
+          "properties": {
+            "steps": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 100000,
+              "description": "Total steps"
+            },
+            "distance_meters": {
+              "type": "number",
+              "minimum": 0,
+              "description": "Distance traveled in meters"
+            },
+            "calories_burned": {
+              "type": "integer",
+              "minimum": 0,
+              "description": "Calories burned"
+            },
+            "active_minutes": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 1440,
+              "description": "Minutes of active movement"
+            },
+            "sedentary_minutes": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 1440,
+              "description": "Minutes of sedentary behavior"
+            },
+            "intensity_zones": {
+              "type": "object",
+              "properties": {
+                "light_minutes": {
+                  "type": "integer",
+                  "minimum": 0
+                },
+                "moderate_minutes": {
+                  "type": "integer",
+                  "minimum": 0
+                },
+                "vigorous_minutes": {
+                  "type": "integer",
+                  "minimum": 0
+                }
+              }
+            }
+          }
+        },
+        "stress_score": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 100,
+          "description": "Device-calculated stress score"
+        },
+        "spo2_percent": {
+          "type": "number",
+          "minimum": 70,
+          "maximum": 100,
+          "description": "Blood oxygen saturation percentage"
+        },
+        "skin_temperature_celsius": {
+          "type": "number",
+          "minimum": 30,
+          "maximum": 42,
+          "description": "Skin temperature in Celsius"
+        }
+      },
+      "additionalProperties": false
+    },
+    "data_quality": {
+      "type": "object",
+      "properties": {
+        "completeness_percent": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 100,
+          "description": "Data completeness percentage"
+        },
+        "wear_time_minutes": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 1440,
+          "description": "Device wear time in minutes"
+        }
+      }
+    }
+  },
+  "additionalProperties": false
+}

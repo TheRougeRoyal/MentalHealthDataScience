@@ -1,0 +1,76 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: mhras-config
+  labels:
+    app: mhras
+data:
+  # Logging configuration
+  log_level: "INFO"
+  log_format: "json"
+  
+  # API configuration
+  api_timeout: "5"
+  max_request_size: "10485760"  # 10MB
+  
+  # Model configuration
+  model_inference_timeout: "2"
+  ensemble_weights: "lgbm:0.4,rnn:0.3,tft:0.3"
+  
+  # Feature engineering configuration
+  behavioral_window_days: "30"
+  sleep_window_days: "7"
+  
+  # Risk thresholds
+  risk_threshold_low: "25"
+  risk_threshold_moderate: "50"
+  risk_threshold_high: "75"
+  alert_threshold: "75"
+  
+  # Human review configuration
+  human_review_threshold: "75"
+  review_escalation_hours: "4"
+  
+  # Drift monitoring configuration
+  drift_check_interval: "3600"  # 1 hour in seconds
+  drift_threshold: "0.3"
+  
+  # Performance settings
+  batch_size: "1000"
+  etl_timeout: "60"
+  feature_timeout: "2"
+  explanation_timeout: "3"
+  
+  # Database connection pool
+  db_pool_size: "20"
+  db_max_overflow: "10"
+  db_pool_timeout: "30"
+  
+  # Cache settings
+  cache_ttl: "300"  # 5 minutes
+  consent_cache_ttl: "600"  # 10 minutes
+  
+  # Experiment tracking configuration
+  experiment_storage_backend: "filesystem"
+  experiment_artifacts_path: "/app/experiments/artifacts"
+  experiment_db_table_prefix: "exp_"
+  
+  # Data versioning configuration
+  data_version_storage_path: "/app/data/versions"
+  data_version_compression: "gzip"
+  data_version_deduplication: "true"
+  
+  # Feature store configuration
+  feature_store_cache_backend: "redis"
+  feature_store_redis_url: "redis://mhras-redis:6379"
+  feature_store_cache_ttl: "3600"
+  
+  # EDA module configuration
+  eda_max_dataset_size: "1000000"
+  eda_visualization_dpi: "300"
+  eda_report_template: "default"
+  
+  # Model card configuration
+  model_card_template: "default"
+  model_card_include_shap: "true"
+  model_card_include_fairness: "true"

@@ -1,0 +1,69 @@
+{
+  "dashboard": {
+    "title": "MHRAS Clinical Dashboard",
+    "tags": ["mhras", "clinical", "governance"],
+    "timezone": "browser",
+    "panels": [
+      {
+        "id": 1,
+        "title": "Human Review Queue Size",
+        "type": "graph",
+        "targets": [
+          {
+            "expr": "mhras_human_review_queue_size",
+            "legendFormat": "Queue Size"
+          }
+        ],
+        "gridPos": {"h": 8, "w": 12, "x": 0, "y": 0}
+      },
+      {
+        "id": 2,
+        "title": "Risk Score Distribution",
+        "type": "heatmap",
+        "targets": [
+          {
+            "expr": "rate(mhras_screenings_total[5m])",
+            "legendFormat": "{{risk_level}}"
+          }
+        ],
+        "gridPos": {"h": 8, "w": 12, "x": 12, "y": 0}
+      },
+      {
+        "id": 3,
+        "title": "Critical Cases (24h)",
+        "type": "stat",
+        "targets": [
+          {
+            "expr": "sum(increase(mhras_screenings_total{risk_level=\"critical\"}[24h]))"
+          }
+        ],
+        "gridPos": {"h": 4, "w": 6, "x": 0, "y": 8}
+      },
+      {
+        "id": 4,
+        "title": "High Risk Cases (24h)",
+        "type": "stat",
+        "targets": [
+          {
+            "expr": "sum(increase(mhras_screenings_total{risk_level=\"high\"}[24h]))"
+          }
+        ],
+        "gridPos": {"h": 4, "w": 6, "x": 6, "y": 8}
+      },
+      {
+        "id": 5,
+        "title": "Screenings Over Time",
+        "type": "graph",
+        "targets": [
+          {
+            "expr": "sum(rate(mhras_screenings_total[5m])) by (risk_level)",
+            "legendFormat": "{{risk_level}}"
+          }
+        ],
+        "gridPos": {"h": 8, "w": 24, "x": 0, "y": 12}
+      }
+    ],
+    "refresh": "30s",
+    "time": {"from": "now-24h", "to": "now"}
+  }
+}
