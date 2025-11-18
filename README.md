@@ -290,6 +290,8 @@ Request → Validation → Consent → ETL → Features → ML Inference
 
 ## Quick Start
 
+> **🚀 New to the system?** See [QUICKSTART.md](QUICKSTART.md) for a 5-minute setup guide!
+
 ### Prerequisites
 
 - Python 3.9+
@@ -313,7 +315,7 @@ pip install -r requirements.txt
 
 # Configure environment
 cp config/.env.example .env
-# Edit .env with your settings
+# Edit .env with your settings (default works for development!)
 ```
 
 ### Minimum Configuration

@@ -1,0 +1,153 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Mental Health Risk Assessment System</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>🧠 Mental Health Risk Assessment</h1>
+            <p class="subtitle">Comprehensive screening and support recommendations</p>
+        </header>
+
+        <main>
+            <!-- Authentication Section -->
+            <section id="auth-section" class="card">
+                <h2>Authentication</h2>
+                <div class="form-group">
+                    <label for="api-token">API Token (Optional - Development Mode):</label>
+                    <input type="password" id="api-token" placeholder="Leave empty for development mode">
+                    <button onclick="saveToken()" class="btn btn-primary">Save Token</button>
+                </div>
+                <p class="info-text">ℹ️ Authentication is optional in development mode. You can proceed without a token.</p>
+            </section>
+
+            <!-- Screening Form -->
+            <section id="screening-section" class="card">
+                <h2>Patient Screening</h2>
+                
+                <div class="form-group">
+                    <label for="anonymized-id">Anonymized Patient ID:</label>
+                    <input type="text" id="anonymized-id" placeholder="e.g., patient_12345" required>
+                </div>
+
+                <div class="form-group">
+                    <label>
+                        <input type="checkbox" id="consent-verified" required>
+                        Patient consent verified
+                    </label>
+                </div>
+
+                <div class="data-sections">
+                    <!-- Survey Data -->
+                    <div class="data-section">
+                        <h3>📋 Survey Data</h3>
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label for="phq9-score">PHQ-9 Score (0-27):</label>
+                                <input type="number" id="phq9-score" min="0" max="27" placeholder="Depression screening">
+                            </div>
+                            <div class="form-group">
+                                <label for="gad7-score">GAD-7 Score (0-21):</label>
+                                <input type="number" id="gad7-score" min="0" max="21" placeholder="Anxiety screening">
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Wearable Data -->
+                    <div class="data-section">
+                        <h3>⌚ Wearable Data</h3>
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label for="avg-heart-rate">Avg Heart Rate (bpm):</label>
+                                <input type="number" id="avg-heart-rate" min="40" max="200" placeholder="e.g., 75">
+                            </div>
+                            <div class="form-group">
+                                <label for="sleep-hours">Sleep Hours:</label>
+                                <input type="number" id="sleep-hours" min="0" max="24" step="0.5" placeholder="e.g., 6.5">
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- EMR Data -->
+                    <div class="data-section">
+                        <h3>🏥 EMR Data</h3>
+                        <div class="form-group">
+                            <label for="diagnosis-codes">Diagnosis Codes (comma-separated):</label>
+                            <input type="text" id="diagnosis-codes" placeholder="e.g., F32.1, F41.1">
+                        </div>
+                        <div class="form-group">
+                            <label for="medications">Medications (comma-separated):</label>
+                            <input type="text" id="medications" placeholder="e.g., sertraline, lorazepam">
+                        </div>
+                    </div>
+                </div>
+
+                <button onclick="submitScreening()" class="btn btn-primary btn-large">
+                    Run Risk Assessment
+                </button>
+            </section>
+
+            <!-- Results Section -->
+            <section id="results-section" class="card" style="display: none;">
+                <h2>Assessment Results</h2>
+                
+                <!-- Risk Score -->
+                <div id="risk-score-display" class="risk-display">
+                    <div class="risk-header">
+                        <h3>Risk Score</h3>
+                        <span id="risk-badge" class="risk-badge"></span>
+                    </div>
+                    <div class="risk-score-value">
+                        <span id="score-value">--</span>
+                        <span class="score-label">/100</span>
+                    </div>
+                    <div class="confidence">
+                        Confidence: <span id="confidence-value">--</span>%
+                    </div>
+                </div>
+
+                <!-- Alerts -->
+                <div id="alerts-display"></div>
+
+                <!-- Contributing Factors -->
+                <div id="factors-display" class="factors-section">
+                    <h3>Contributing Factors</h3>
+                    <ul id="factors-list"></ul>
+                </div>
+
+                <!-- Recommendations -->
+                <div id="recommendations-display" class="recommendations-section">
+                    <h3>Recommended Resources</h3>
+                    <div id="recommendations-list"></div>
+                </div>
+
+                <!-- Explanations -->
+                <div id="explanations-display" class="explanations-section">
+                    <h3>Model Explanation</h3>
+                    <div id="explanations-content"></div>
+                </div>
+            </section>
+
+            <!-- Loading Indicator -->
+            <div id="loading" class="loading" style="display: none;">
+                <div class="spinner"></div>
+                <p>Processing assessment...</p>
+            </div>
+
+            <!-- Error Display -->
+            <div id="error-display" class="error-message" style="display: none;"></div>
+        </main>
+
+        <footer>
+            <p>Mental Health Risk Assessment System v1.0.0</p>
+            <p class="disclaimer">⚠️ This tool is for clinical decision support only. Always consult with healthcare professionals.</p>
+        </footer>
+    </div>
+
+    <script src="app.js"></script>
+</body>
+</html>

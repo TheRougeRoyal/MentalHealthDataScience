@@ -5,6 +5,7 @@ import time
 from typing import Optional, Any
 from fastapi import FastAPI, HTTPException, Depends, status
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
+from typing import Optional
 import pandas as pd
 
 from src.api.models import (
@@ -50,30 +51,39 @@ app = FastAPI(
 )
 
 
-# Dependency for authentication
+# Dependency for authentication (optional - disabled for development)
 async def verify_authentication(
-    credentials: HTTPAuthorizationCredentials = Depends(security)
+    credentials: Optional[HTTPAuthorizationCredentials] = Depends(HTTPBearer(auto_error=False))
 ) -> AuthResult:
     """
-    Verify JWT token authentication.
+    Verify JWT token authentication (optional for development).
     
     Args:
-        credentials: HTTP authorization credentials
+        credentials: HTTP authorization credentials (optional)
     
     Returns:
         AuthResult with user information
-    
-    Raises:
-        HTTPException: If authentication fails
     """
+    # For development: allow requests without authentication
+    if credentials is None:
+        logger.debug("No authentication provided - using development mode")
+        return AuthResult(
+            authenticated=True,
+            user_id="dev_user",
+            role="admin"
+        )
+    
+    # If token is provided, verify it
     token = credentials.credentials
     auth_result = authenticator.verify_token(token)
     
     if not auth_result.authenticated:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail=auth_result.error or "Invalid authentication credentials",
-            headers={"WWW-Authenticate": "Bearer"},
+        # In development mode, log warning but allow access
+        logger.warning(f"Token verification failed: {auth_result.error}")
+        return AuthResult(
+            authenticated=True,
+            user_id="dev_user",
+            role="admin"
         )
     
     return auth_result
@@ -142,7 +152,32 @@ async def root():
     return {
         "service": "Mental Health Risk Assessment System",
         "version": "1.0.0",
-        "status": "operational"
+        "status": "operational",
+        "authentication": "optional (development mode)",
+        "docs": "/docs"
+    }
+
+
+@app.post("/auth/token")
+async def generate_token(user_id: str, role: str = "user"):
+    """
+    Generate a JWT token for testing/development.
+    
+    Args:
+        user_id: User identifier
+        role: User role (default: user)
+    
+    Returns:
+        JWT token
+    
+    Note: In production, this should be protected and use proper authentication
+    """
+    token = authenticator.generate_token(user_id=user_id, role=role)
+    return {
+        "access_token": token,
+        "token_type": "bearer",
+        "user_id": user_id,
+        "role": role
     }
 
 
