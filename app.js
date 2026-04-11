@@ -42,7 +42,13 @@ async function checkSystemStatus() {
         });
 
         if (healthResponse.ok) {
+            const health = await healthResponse.json();
             updateStatusElement('api-status', 'healthy', 'Healthy');
+
+            // Show demo banner if in demo mode
+            if (health.mode === 'demo') {
+                document.getElementById('demo-banner').style.display = 'block';
+            }
         } else {
             updateStatusElement('api-status', 'error', 'Error');
         }
@@ -430,16 +436,62 @@ function hideResults() {
 
 function showSuccess(message) {
     const errorDisplay = document.getElementById('error-display');
-    errorDisplay.style.backgroundColor = '#d4edda';
-    errorDisplay.style.color = '#155724';
-    errorDisplay.style.borderLeftColor = '#28a745';
+    errorDisplay.className = 'success-message';
     errorDisplay.textContent = message;
     errorDisplay.style.display = 'block';
 
     setTimeout(() => {
         errorDisplay.style.display = 'none';
-        errorDisplay.style.backgroundColor = '';
-        errorDisplay.style.color = '';
-        errorDisplay.style.borderLeftColor = '';
+        errorDisplay.className = '';
     }, 3000);
+}
+
+// Load sample batch data for demo
+function loadSampleBatchData() {
+    const sampleData = [
+        {
+            anonymized_id: "demo_patient_001",
+            consent_verified: true,
+            survey_data: { phq9_score: 18, gad7_score: 14 },
+            wearable_data: { sleep_hours: 4.5, avg_heart_rate: 82 }
+        },
+        {
+            anonymized_id: "demo_patient_002",
+            consent_verified: true,
+            survey_data: { phq9_score: 8, gad7_score: 6 },
+            wearable_data: { sleep_hours: 7, avg_heart_rate: 68 }
+        },
+        {
+            anonymized_id: "demo_patient_003",
+            consent_verified: true,
+            survey_data: { phq9_score: 22, gad7_score: 18 },
+            wearable_data: { sleep_hours: 3.5, avg_heart_rate: 95 }
+        },
+        {
+            anonymized_id: "demo_patient_004",
+            consent_verified: true,
+            survey_data: { phq9_score: 5, gad7_score: 4 },
+            wearable_data: { sleep_hours: 8, avg_heart_rate: 62 }
+        },
+        {
+            anonymized_id: "demo_patient_005",
+            consent_verified: true,
+            survey_data: { phq9_score: 12, gad7_score: 10 },
+            wearable_data: { sleep_hours: 5.5, avg_heart_rate: 75 }
+        }
+    ];
+
+    document.getElementById('batch-data').value = JSON.stringify(sampleData, null, 2);
+    showSuccess('Sample data loaded! Click "Run Batch Assessment" to test.');
+}
+
+// Load sample single screening data
+function loadSampleScreeningData() {
+    document.getElementById('anonymized-id').value = 'demo_patient_sample';
+    document.getElementById('consent-verified').checked = true;
+    document.getElementById('phq9-score').value = '15';
+    document.getElementById('gad7-score').value = '12';
+    document.getElementById('sleep-hours').value = '5.5';
+    document.getElementById('avg-heart-rate').value = '78';
+    showSuccess('Sample data loaded! Click "Run Risk Assessment" to test.');
 }

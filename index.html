@@ -3,21 +3,48 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="Mental Health Risk Assessment System - ML-powered screening tool with PHQ-9 and GAD-7 assessments, providing risk scores and clinical recommendations.">
+    <meta name="keywords" content="mental health, risk assessment, PHQ-9, GAD-7, clinical decision support, healthcare">
+    <meta name="author" content="Aakash Raj">
+
+    <!-- Open Graph / Social Media -->
+    <meta property="og:type" content="website">
+    <meta property="og:title" content="Mental Health Risk Assessment System">
+    <meta property="og:description" content="ML-powered mental health screening with PHQ-9, GAD-7 assessments and clinical decision support.">
+    <meta property="og:image" content="/api/og">
+
+    <!-- Twitter Card -->
+    <meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:title" content="Mental Health Risk Assessment System">
+    <meta name="twitter:description" content="ML-powered mental health screening with PHQ-9, GAD-7 assessments and clinical decision support.">
+
     <title>Mental Health Risk Assessment System</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="styles.css">
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🧠</text></svg>">
 </head>
 <body>
     <div class="container">
         <header>
-            <h1>🧠 Mental Health Risk Assessment</h1>
-            <p class="subtitle">Comprehensive screening and support recommendations</p>
+            <div class="header-icon">
+                <svg viewBox="0 0 24 24" fill="currentColor">
+                    <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z"/>
+                </svg>
+            </div>
+            <h1>Mental Health Risk Assessment</h1>
+            <p class="subtitle">Evidence-based screening powered by clinical AI</p>
+            <div id="demo-banner" class="demo-banner" style="display: none;">
+                Demo Mode — Using simulated predictions for demonstration
+            </div>
         </header>
 
         <main>
             <!-- Crisis Resources - Always Visible -->
-            <section id="crisis-section" class="card crisis-banner">
-                <h2>🆘 Crisis Resources</h2>
-                <p>If you or someone you know is in crisis, please reach out immediately:</p>
+            <section id="crisis-section" class="card crisis-banner" aria-label="Crisis Resources">
+                <h2>Immediate Crisis Support</h2>
+                <p>If you or someone you know is in crisis, these resources are available 24/7:</p>
                 <div class="crisis-resources">
                     <div class="crisis-item">
                         <strong>988 Suicide & Crisis Lifeline</strong>
@@ -35,78 +62,86 @@
             </section>
 
             <!-- System Status -->
-            <section id="status-section" class="card">
+            <section id="status-section" class="card" aria-label="System Status">
                 <h2>System Status</h2>
                 <div class="status-grid">
                     <div class="status-item">
-                        <span class="status-label">API Status:</span>
-                        <span id="api-status" class="status-value">Checking...</span>
+                        <span class="status-label">API</span>
+                        <span id="api-status" class="status-value status-checking">Checking...</span>
                     </div>
                     <div class="status-item">
-                        <span class="status-label">Models:</span>
-                        <span id="models-status" class="status-value">Checking...</span>
+                        <span class="status-label">Models</span>
+                        <span id="models-status" class="status-value status-checking">Checking...</span>
                     </div>
                     <div class="status-item">
-                        <span class="status-label">Queue:</span>
-                        <span id="queue-status" class="status-value">Checking...</span>
+                        <span class="status-label">Queue</span>
+                        <span id="queue-status" class="status-value status-checking">Checking...</span>
                     </div>
                 </div>
-                <button onclick="checkSystemStatus()" class="btn btn-secondary">Refresh Status</button>
+                <button onclick="checkSystemStatus()" class="btn btn-secondary">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M23 4v6h-6M1 20v-6h6M3.51 9a9 9 0 0114.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0020.49 15"/>
+                    </svg>
+                    Refresh
+                </button>
             </section>
 
             <!-- Authentication Section -->
-            <section id="auth-section" class="card">
+            <section id="auth-section" class="card" aria-label="Authentication">
                 <h2>Authentication</h2>
                 <div class="form-group">
-                    <label for="api-token">API Token (Optional - Development Mode):</label>
-                    <input type="password" id="api-token" placeholder="Leave empty for development mode">
-                    <button onclick="saveToken()" class="btn btn-primary">Save Token</button>
+                    <label for="api-token">API Token <span style="color: var(--text-muted);">(optional in development)</span></label>
+                    <div style="display: flex; gap: 12px; margin-top: 8px;">
+                        <input type="password" id="api-token" placeholder="Enter your API token" style="flex: 1;">
+                        <button onclick="saveToken()" class="btn btn-primary">Save</button>
+                    </div>
                 </div>
-                <p class="info-text">ℹ️ Authentication is optional in development mode. You can proceed without a token.</p>
             </section>
 
             <!-- Screening Form -->
-            <section id="screening-section" class="card">
+            <section id="screening-section" class="card" aria-label="Patient Screening">
                 <h2>Patient Screening</h2>
 
                 <div class="form-group">
-                    <label for="anonymized-id">Anonymized Patient ID:</label>
+                    <label for="anonymized-id">Anonymized Patient ID</label>
                     <input type="text" id="anonymized-id" placeholder="e.g., patient_12345" required>
                 </div>
 
                 <div class="form-group">
-                    <label>
+                    <label style="display: flex; align-items: center; cursor: pointer;">
                         <input type="checkbox" id="consent-verified" required>
-                        Patient consent verified
+                        <span>Patient consent has been verified</span>
                     </label>
                 </div>
 
                 <div class="data-sections">
                     <!-- Survey Data -->
                     <div class="data-section">
-                        <h3>📋 Survey Data</h3>
+                        <h3>Survey Assessments</h3>
                         <div class="form-row">
                             <div class="form-group">
-                                <label for="phq9-score">PHQ-9 Score (0-27):</label>
-                                <input type="number" id="phq9-score" min="0" max="27" placeholder="Depression screening">
+                                <label for="phq9-score">PHQ-9 Score</label>
+                                <input type="number" id="phq9-score" min="0" max="27" placeholder="0-27">
+                                <p class="info-text">Depression screening questionnaire</p>
                             </div>
                             <div class="form-group">
-                                <label for="gad7-score">GAD-7 Score (0-21):</label>
-                                <input type="number" id="gad7-score" min="0" max="21" placeholder="Anxiety screening">
+                                <label for="gad7-score">GAD-7 Score</label>
+                                <input type="number" id="gad7-score" min="0" max="21" placeholder="0-21">
+                                <p class="info-text">Anxiety screening questionnaire</p>
                             </div>
                         </div>
                     </div>
 
                     <!-- Wearable Data -->
                     <div class="data-section">
-                        <h3>⌚ Wearable Data</h3>
+                        <h3>Wearable Data</h3>
                         <div class="form-row">
                             <div class="form-group">
-                                <label for="avg-heart-rate">Avg Heart Rate (bpm):</label>
+                                <label for="avg-heart-rate">Avg Heart Rate (bpm)</label>
                                 <input type="number" id="avg-heart-rate" min="40" max="200" placeholder="e.g., 75">
                             </div>
                             <div class="form-group">
-                                <label for="sleep-hours">Sleep Hours:</label>
+                                <label for="sleep-hours">Sleep Hours</label>
                                 <input type="number" id="sleep-hours" min="0" max="24" step="0.5" placeholder="e.g., 6.5">
                             </div>
                         </div>
@@ -114,46 +149,54 @@
 
                     <!-- EMR Data -->
                     <div class="data-section">
-                        <h3>🏥 EMR Data</h3>
+                        <h3>Electronic Medical Record</h3>
                         <div class="form-group">
-                            <label for="diagnosis-codes">Diagnosis Codes (comma-separated):</label>
-                            <input type="text" id="diagnosis-codes" placeholder="e.g., F32.1, F41.1">
+                            <label for="diagnosis-codes">Diagnosis Codes</label>
+                            <input type="text" id="diagnosis-codes" placeholder="Comma-separated, e.g., F32.1, F41.1">
                         </div>
-                        <div class="form-group">
-                            <label for="medications">Medications (comma-separated):</label>
-                            <input type="text" id="medications" placeholder="e.g., sertraline, lorazepam">
+                        <div class="form-group" style="margin-bottom: 0;">
+                            <label for="medications">Current Medications</label>
+                            <input type="text" id="medications" placeholder="Comma-separated, e.g., sertraline, lorazepam">
                         </div>
                     </div>
                 </div>
 
-                <button onclick="submitScreening()" class="btn btn-primary btn-large">
-                    Run Risk Assessment
-                </button>
+                <div class="button-row">
+                    <button onclick="submitScreening()" class="btn btn-primary btn-large">
+                        Run Risk Assessment
+                    </button>
+                    <button onclick="loadSampleScreeningData()" class="btn btn-secondary">
+                        Load Sample Data
+                    </button>
+                </div>
             </section>
 
             <!-- Batch Screening -->
-            <section id="batch-section" class="card">
+            <section id="batch-section" class="card" aria-label="Batch Screening">
                 <h2>Batch Screening</h2>
-                <p class="info-text">Submit multiple screening requests at once (max 100).</p>
+                <p class="info-text" style="margin-bottom: 16px;">Submit multiple screening requests at once (maximum 100 per batch)</p>
 
                 <div class="form-group">
-                    <label for="batch-data">Batch Data (JSON array):</label>
-                    <textarea id="batch-data" rows="6" placeholder='[{"anonymized_id": "p1", "survey_data": {"phq9_score": 15}}, {"anonymized_id": "p2", "survey_data": {"phq9_score": 5}}]'></textarea>
+                    <label for="batch-data">Batch Data (JSON array)</label>
+                    <textarea id="batch-data" rows="6" placeholder='[{"anonymized_id": "patient_001", "consent_verified": true, "survey_data": {"phq9_score": 15, "gad7_score": 12}}]'></textarea>
+                    <button onclick="loadSampleBatchData()" class="btn btn-secondary" style="margin-top: 10px;">
+                        Load Sample Data
+                    </button>
                 </div>
 
-                <button onclick="submitBatchScreening()" class="btn btn-secondary">Run Batch Assessment</button>
+                <button onclick="submitBatchScreening()" class="btn btn-primary">Run Batch Assessment</button>
 
                 <div id="batch-results" class="batch-results" style="display: none;"></div>
             </section>
 
             <!-- Results Section -->
-            <section id="results-section" class="card" style="display: none;">
+            <section id="results-section" class="card" style="display: none;" aria-label="Assessment Results">
                 <h2>Assessment Results</h2>
 
                 <!-- Risk Score -->
                 <div id="risk-score-display" class="risk-display">
                     <div class="risk-header">
-                        <h3>Risk Score</h3>
+                        <h3>Risk Level</h3>
                         <span id="risk-badge" class="risk-badge"></span>
                     </div>
                     <div class="risk-score-value">
@@ -166,7 +209,7 @@
                 </div>
 
                 <!-- Alerts -->
-                <div id="alerts-display"></div>
+                <div id="alerts-display" role="alert"></div>
 
                 <!-- Contributing Factors -->
                 <div id="factors-display" class="factors-section">
@@ -188,18 +231,19 @@
             </section>
 
             <!-- Loading Indicator -->
-            <div id="loading" class="loading" style="display: none;">
+            <div id="loading" class="loading" style="display: none;" role="status" aria-live="polite">
                 <div class="spinner"></div>
                 <p>Processing assessment...</p>
             </div>
 
             <!-- Error Display -->
-            <div id="error-display" class="error-message" style="display: none;"></div>
+            <div id="error-display" role="alert" style="display: none;"></div>
         </main>
 
         <footer>
-            <p>Mental Health Risk Assessment System v1.0.0</p>
-            <p class="disclaimer">⚠️ This tool is for clinical decision support only. Always consult with healthcare professionals.</p>
+            <p><strong>Mental Health Risk Assessment System</strong> v1.0.0</p>
+            <p class="disclaimer">This tool is for clinical decision support only. Always consult with healthcare professionals for medical decisions.</p>
+            <p class="tech-stack">Built with FastAPI, LightGBM, and SHAP &mdash; <a href="https://github.com/aakashraj" target="_blank" rel="noopener">View Source</a></p>
         </footer>
     </div>
 

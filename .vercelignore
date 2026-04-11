@@ -1,7 +1,5 @@
 # Dependencies
 node_modules/
-__pycache__/
-*.pyc
 
 # Git
 .git/
@@ -22,24 +20,26 @@ __pycache__/
 .DS_Store
 Thumbs.db
 
-# Python project files (Vercel is for frontend + serverless)
-# Keep source for FastAPI entrypoint and dependencies
-# config/
-# src/
-# scripts/
-# examples/
-# tests/
-# k8s/
-# models/
-# monitoring/
-# docs/
-*.md
-!VERCEL_DEPLOY.md
+# Python backend (not needed for Vercel frontend)
+__pycache__/
+*.pyc
+*.pyo
+src/
+config/
+examples/
+scripts/
+tests/
+k8s/
+models/
+monitoring/
+*.py
+requirements.txt
 
-# ML Models
-*.pkl
-*.joblib
-*.h5
+# Docker
+Dockerfile
+docker-*.sh
+docker-compose*.yml
+.dockerignore
 
 # Database
 *.db
@@ -49,10 +49,16 @@ Thumbs.db
 *.log
 logs/
 
-# Backend specific
-requirements.txt
-Dockerfile
-docker-*.sh
-docker-compose*.yml
-# *.py
+# Documentation
+*.md
+!README.md
+
+# Other
+.claude/
+.kiro/
+railway.json
+setup_database.sh
+run_*.py
+test_*.py
+verify_integration.py
 

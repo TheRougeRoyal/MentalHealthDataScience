@@ -43,7 +43,6 @@ COPY src/ ./src/
 COPY config/ ./config/
 COPY examples/ ./examples/
 COPY scripts/ ./scripts/
-COPY frontend/ ./frontend/
 
 # Create directories for models, data, experiments, and datasets
 RUN mkdir -p /app/models /app/data /app/logs /app/experiments/artifacts /app/data/versions
