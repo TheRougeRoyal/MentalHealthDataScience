@@ -1,138 +1,191 @@
-"""Database configuration and session management using SQLAlchemy."""
+"""Database configuration and session management.
+
+Provides a SQLAlchemy 2.0 engine and session factory with automatic
+backend detection: PostgreSQL when credentials are available, SQLite
+otherwise.  All module-level state is intentionally lazy-safe so that
+imports never trigger network I/O.
+"""
+
+from __future__ import annotations
 
 import logging
 import os
+from contextlib import contextmanager
 from typing import Generator
 from urllib.parse import quote_plus
 
-from sqlalchemy import create_engine, event
-from sqlalchemy.orm import Session, declarative_base, sessionmaker
+from sqlalchemy import create_engine, event, text
+from sqlalchemy.orm import DeclarativeBase, Session, sessionmaker
 from sqlalchemy.pool import StaticPool
 
 from src.config import settings
 
 logger = logging.getLogger(__name__)
 
+# ---------------------------------------------------------------------------
+# Declarative base
+# ---------------------------------------------------------------------------
+
+
+class Base(DeclarativeBase):
+    """Shared declarative base for all ORM models."""
+
+
+# ---------------------------------------------------------------------------
+# URL resolution
+# ---------------------------------------------------------------------------
+
+_SQLITE_FALLBACK = "sqlite:///./mhras.db"
+
 
 def _build_database_url() -> str:
-    """Resolve the database URL with PostgreSQL preferred and SQLite fallback."""
+    """Build the database URL.
+
+    Resolution order:
+      1. ``DATABASE_URL`` environment variable (honours Heroku / Railway
+         convention).
+      2. Assembled from ``settings.database`` fields when *host*, *user*,
+         and *name* are all non-empty.
+      3. Local SQLite file as a development fallback.
+    """
     explicit_url = os.getenv("DATABASE_URL")
     if explicit_url:
+        # Heroku-style postgres:// → postgresql://
+        if explicit_url.startswith("postgres://"):
+            explicit_url = explicit_url.replace("postgres://", "postgresql://", 1)
         return explicit_url
 
-    db_config = settings.database
-    if db_config.host and db_config.user and db_config.name:
-        password = quote_plus(db_config.password or "")
+    db = settings.database
+    if db.host and db.user and db.name:
+        password = quote_plus(db.password) if db.password else ""
         return (
-            f"postgresql+psycopg2://{db_config.user}:{password}"
-            f"@{db_config.host}:{db_config.port}/{db_config.name}"
+            f"postgresql+psycopg2://{db.user}:{password}"
+            f"@{db.host}:{db.port}/{db.name}"
         )
 
-    return "sqlite:///./mhras.db"
+    logger.warning("No PostgreSQL credentials found – falling back to SQLite")
+    return _SQLITE_FALLBACK
 
 
-DATABASE_URL = _build_database_url()
-is_sqlite = DATABASE_URL.startswith("sqlite")
+DATABASE_URL: str = _build_database_url()
+IS_SQLITE: bool = DATABASE_URL.startswith("sqlite")
 
-engine_kwargs = {
-    "future": True,
-}
+# ---------------------------------------------------------------------------
+# Engine
+# ---------------------------------------------------------------------------
 
-if is_sqlite:
-    engine_kwargs.update(
-        {
-            "connect_args": {"check_same_thread": False},
-        }
-    )
-    if DATABASE_URL in {"sqlite://", "sqlite:///:memory:"}:
-        # Needed for in-memory SQLite so all sessions share one connection.
-        engine_kwargs["poolclass"] = StaticPool
-    logger.info("Configured SQLite database")
-else:
-    db_config = settings.database
-    engine_kwargs.update(
-        {
-            "pool_pre_ping": True,
-            "pool_recycle": 3600,
-            "pool_size": db_config.pool_size,
-            "max_overflow": 10,
-        }
-    )
-    logger.info(
-        "Configured PostgreSQL database: %s:%s/%s",
-        db_config.host,
-        db_config.port,
-        db_config.name,
-    )
 
-engine = create_engine(DATABASE_URL, **engine_kwargs)
+def _create_engine():
+    """Create the SQLAlchemy engine with backend-specific tuning."""
+    kwargs: dict = {"future": True, "echo": False}
 
-if is_sqlite:
+    if IS_SQLITE:
+        kwargs["connect_args"] = {"check_same_thread": False}
+        if DATABASE_URL in {"sqlite://", "sqlite:///:memory:"}:
+            kwargs["poolclass"] = StaticPool
+        logger.info("Using SQLite backend")
+    else:
+        db = settings.database
+        kwargs.update(
+            {
+                "pool_pre_ping": True,
+                "pool_recycle": 3600,
+                "pool_size": db.pool_size,
+                "max_overflow": 10,
+            }
+        )
+        logger.info("Using PostgreSQL backend (%s:%s/%s)", db.host, db.port, db.name)
+
+    return create_engine(DATABASE_URL, **kwargs)
+
+
+engine = _create_engine()
+
+
+# Enable foreign-key enforcement and WAL journal mode for SQLite.
+if IS_SQLITE:
+
     @event.listens_for(engine, "connect")
-    def _set_sqlite_pragma(dbapi_connection, _connection_record):
-        """Enable SQLite foreign key constraints."""
+    def _set_sqlite_pragmas(dbapi_connection, _connection_record):
         cursor = dbapi_connection.cursor()
-        cursor.execute("PRAGMA foreign_keys=ON")
+        cursor.execute("PRAGMA foreign_keys = ON")
+        cursor.execute("PRAGMA journal_mode = WAL")
         cursor.close()
 
 
-SessionLocal = sessionmaker(
+# ---------------------------------------------------------------------------
+# Session factory
+# ---------------------------------------------------------------------------
+
+SessionLocal: sessionmaker[Session] = sessionmaker(
+    bind=engine,
     autocommit=False,
     autoflush=False,
-    bind=engine,
     expire_on_commit=False,
-    future=True,
 )
 
-Base = declarative_base()
+# ---------------------------------------------------------------------------
+# Public helpers
+# ---------------------------------------------------------------------------
 
 
 def get_db() -> Generator[Session, None, None]:
-    """
-    Dependency function that provides a database session.
+    """FastAPI dependency that yields a transactional database session.
 
-    Yields:
-        SQLAlchemy Session object
+    Usage::
 
-    Usage:
-        @app.get("/items")
-        def get_items(db: Session = Depends(get_db)):
+        @router.get("/screenings")
+        def list_screenings(db: Session = Depends(get_db)):
             ...
     """
-    db = SessionLocal()
+    session = SessionLocal()
     try:
-        yield db
+        yield session
     finally:
-        db.close()
+        session.close()
+
+
+@contextmanager
+def get_session() -> Generator[Session, None, None]:
+    """Context-manager variant for use outside of FastAPI.
+
+    Usage::
+
+        with get_session() as session:
+            session.add(obj)
+            session.commit()
+    """
+    session = SessionLocal()
+    try:
+        yield session
+        session.commit()
+    except Exception:
+        session.rollback()
+        raise
+    finally:
+        session.close()
 
 
 def init_db() -> None:
-    """
-    Initialize the database by creating all tables.
+    """Create all tables registered on :pyattr:`Base.metadata`.
 
-    Call this during application startup to ensure tables exist.
-    For production, use Alembic migrations instead.
+    Safe to call multiple times – existing tables are not recreated.
+    In production, prefer Alembic migrations.
     """
-    logger.info("Initializing database tables...")
+    logger.info("Initializing database tables …")
+    # Import models so they register with Base.metadata before create_all.
+    from src import models  # noqa: F401
+
+    Base.metadata.create_all(bind=engine)
+    logger.info("Database tables ready")
+
+
+def check_health() -> bool:
+    """Return ``True`` if the database is reachable."""
     try:
-        # Import all models to ensure they're registered with Base
-        from src import models  # noqa: F401
-
-        # Create all tables
-        Base.metadata.create_all(bind=engine)
-        logger.info("Database tables created successfully")
-    except Exception as e:
-        logger.error(f"Failed to initialize database: {e}")
-        raise
-
-
-def get_db_connection() -> Session:
-    """
-    Get a database connection for legacy code compatibility.
-
-    Returns:
-        SQLAlchemy Session object
-
-    Note: Prefer using get_db() dependency injection in new code.
-    """
-    return SessionLocal()
+        with engine.connect() as conn:
+            conn.execute(text("SELECT 1"))
+        return True
+    except Exception:
+        logger.exception("Database health-check failed")
+        return False

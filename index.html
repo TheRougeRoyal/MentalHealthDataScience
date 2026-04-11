@@ -70,11 +70,15 @@
                         <span id="api-status" class="status-value status-checking">Checking...</span>
                     </div>
                     <div class="status-item">
-                        <span class="status-label">Models</span>
-                        <span id="models-status" class="status-value status-checking">Checking...</span>
+                        <span class="status-label">Screenings</span>
+                        <span id="screenings-status" class="status-value status-checking">Checking...</span>
                     </div>
                     <div class="status-item">
-                        <span class="status-label">Queue</span>
+                        <span class="status-label">High Risk</span>
+                        <span id="highrisk-status" class="status-value status-checking">Checking...</span>
+                    </div>
+                    <div class="status-item">
+                        <span class="status-label">Pending Reviews</span>
                         <span id="queue-status" class="status-value status-checking">Checking...</span>
                     </div>
                 </div>
@@ -89,12 +93,23 @@
             <!-- Authentication Section -->
             <section id="auth-section" class="card" aria-label="Authentication">
                 <h2>Authentication</h2>
-                <div class="form-group">
-                    <label for="api-token">API Token <span style="color: var(--text-muted);">(optional in development)</span></label>
-                    <div style="display: flex; gap: 12px; margin-top: 8px;">
-                        <input type="password" id="api-token" placeholder="Enter your API token" style="flex: 1;">
-                        <button onclick="saveToken()" class="btn btn-primary">Save</button>
+                <div id="login-form">
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="login-username">Username</label>
+                            <input type="text" id="login-username" placeholder="e.g. admin" autocomplete="username">
+                        </div>
+                        <div class="form-group">
+                            <label for="login-password">Password</label>
+                            <input type="password" id="login-password" placeholder="Password" autocomplete="current-password">
+                        </div>
                     </div>
+                    <button onclick="loginUser()" class="btn btn-primary">Sign In</button>
+                    <p class="info-text" style="margin-top:8px;">Default accounts: <strong>admin</strong> / admin &nbsp;|&nbsp; <strong>reviewer</strong> / reviewer</p>
+                </div>
+                <div id="user-info" style="display:none;">
+                    <p>Signed in as <strong id="user-display-name"></strong> <span id="user-role-badge" class="risk-badge low" style="font-size:0.75rem;"></span></p>
+                    <button onclick="logoutUser()" class="btn btn-secondary">Sign Out</button>
                 </div>
             </section>
 
@@ -189,7 +204,58 @@
                 <div id="batch-results" class="batch-results" style="display: none;"></div>
             </section>
 
-            <!-- Results Section -->
+            <!-- Clinical Review Queue -->
+            <section id="review-section" class="card" aria-label="Clinical Review Queue">
+                <h2>Clinical Review Queue</h2>
+                <p class="info-text" style="margin-bottom:16px;">Cases flagged for clinical review. Requires <strong>admin</strong> or <strong>reviewer</strong> role.</p>
+
+                <div class="review-controls">
+                    <select id="review-status-filter" onchange="loadReviewQueue()">
+                        <option value="pending">Pending</option>
+                        <option value="reviewed">Reviewed</option>
+                        <option value="closed">Closed</option>
+                    </select>
+                    <button onclick="loadReviewQueue()" class="btn btn-secondary">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M23 4v6h-6M1 20v-6h6M3.51 9a9 9 0 0114.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0020.49 15"/></svg>
+                        Refresh
+                    </button>
+                </div>
+
+                <div id="review-queue-list" class="review-queue-list">
+                    <p class="info-text">Click "Refresh" to load the queue.</p>
+                </div>
+
+                <!-- Review detail panel (shown when a review is selected) -->
+                <div id="review-detail" class="review-detail" style="display:none;">
+                    <h3>Review: <span id="review-detail-id"></span></h3>
+                    <div class="review-meta">
+                        <span><strong>Patient:</strong> <span id="review-detail-patient"></span></span>
+                        <span><strong>Risk:</strong> <span id="review-detail-risk"></span></span>
+                        <span><strong>Score:</strong> <span id="review-detail-score"></span></span>
+                        <span><strong>Status:</strong> <span id="review-detail-status" class="risk-badge low"></span></span>
+                    </div>
+
+                    <div id="review-detail-comments" class="review-comments-display"></div>
+
+                    <div class="form-group" style="margin-top:16px;">
+                        <label for="review-assign-input">Assign Reviewer</label>
+                        <div style="display:flex;gap:8px;">
+                            <input type="text" id="review-assign-input" placeholder="Reviewer username">
+                            <button onclick="assignReview()" class="btn btn-primary">Assign</button>
+                        </div>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="review-comment-input">Add Comment</label>
+                        <textarea id="review-comment-input" rows="3" placeholder="Clinical notes…"></textarea>
+                        <div style="display:flex;gap:8px;margin-top:8px;">
+                            <button onclick="commentReview()" class="btn btn-secondary">Save Comment</button>
+                            <button onclick="closeReview()" class="btn btn-primary" style="background:linear-gradient(135deg,var(--success) 0%,var(--accent-dark) 100%);">Close Review</button>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
             <section id="results-section" class="card" style="display: none;" aria-label="Assessment Results">
                 <h2>Assessment Results</h2>
 

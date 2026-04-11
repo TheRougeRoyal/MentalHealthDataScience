@@ -21,23 +21,6 @@ services:
     networks:
       - mhras-network
 
-  # Redis for Feature Store Caching
-  redis:
-    image: redis:7-alpine
-    container_name: mhras-redis
-    command: redis-server --appendonly yes --maxmemory 512mb --maxmemory-policy allkeys-lru
-    ports:
-      - "6379:6379"
-    volumes:
-      - redis_data:/data
-    healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-    networks:
-      - mhras-network
-
   # MHRAS API Service
   api:
     build:
@@ -46,30 +29,11 @@ services:
     container_name: mhras-api
     environment:
       # Database configuration
-      DB_HOST: postgres
-      DB_PORT: "5432"
-      DB_NAME: mhras
-      DB_USER: mhras_user
-      DB_PASSWORD: ${DB_PASSWORD:-mhras_dev_password_2024}
-      DB_POOL_SIZE: "10"
-
-      # Redis configuration
-      FEATURE_STORE_REDIS_URL: redis://redis:6379
-      FEATURE_STORE_CACHE_BACKEND: redis
-      FEATURE_STORE_CACHE_TTL: 3600
-
-      # Experiment tracking configuration
-      EXPERIMENT_STORAGE_BACKEND: filesystem
-      EXPERIMENT_ARTIFACTS_PATH: /app/experiments/artifacts
-
-      # Data versioning configuration
-      DATA_VERSION_STORAGE_PATH: /app/data/versions
-      DATA_VERSION_COMPRESSION: gzip
-      DATA_VERSION_DEDUPLICATION: "true"
+      DATABASE_URL: postgresql://mhras_user:${DB_PASSWORD:-mhras_dev_password_2024}@postgres:5432/mhras
 
       # Security
-      JWT_SECRET_KEY: ${JWT_SECRET_KEY:-dev-secret-key-change-in-production}
-      ANONYMIZATION_SALT: ${ANONYMIZATION_SALT:-dev-salt-change-in-production}
+      SECURITY_JWT_SECRET: ${SECURITY_JWT_SECRET:-dev-secret-key-change-in-production}
+      ENVIRONMENT: ${ENVIRONMENT:-development}
 
       # Application settings
       LOG_LEVEL: ${LOG_LEVEL:-INFO}
@@ -78,22 +42,10 @@ services:
     ports:
       - "8000:8000"
     volumes:
-      # Application code (for development)
       - ./src:/app/src
-      - ./config:/app/config
-
-      # Persistent storage for experiments and datasets
-      - experiments_data:/app/experiments
-      - datasets_data:/app/data/versions
-      - models_data:/app/models
-      - logs_data:/app/logs
     depends_on:
       postgres:
         condition: service_healthy
-      redis:
-        condition: service_healthy
-    # Override entrypoint to skip init (already done in container build)
-    entrypoint: ["/docker-entrypoint.sh"]
     command: ["uvicorn", "src.api.app:app", "--host", "0.0.0.0", "--port", "8000"]
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
@@ -106,16 +58,6 @@ services:
 
 volumes:
   postgres_data:
-    driver: local
-  redis_data:
-    driver: local
-  experiments_data:
-    driver: local
-  datasets_data:
-    driver: local
-  models_data:
-    driver: local
-  logs_data:
     driver: local
 
 networks:

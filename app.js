@@ -2,50 +2,99 @@
 const API_BASE_URL = window.location.hostname === 'localhost'
   ? 'http://localhost:8000'
   : '/api';
-let authToken = '';
 
-// Save authentication token
-function saveToken() {
-    const token = document.getElementById('api-token').value.trim();
-    if (!token) {
-        showError('Please enter an API token');
+// ── Auth helpers (HTTP-only cookies — no JS token storage) ──────────────
+
+async function loginUser() {
+    const username = document.getElementById('login-username').value.trim();
+    const password = document.getElementById('login-password').value.trim();
+
+    if (!username || !password) {
+        showError('Please enter username and password');
         return;
     }
-    authToken = token;
-    localStorage.setItem('mhras_token', token);
-    showSuccess('Token saved successfully');
+
+    try {
+        const res = await fetch(`${API_BASE_URL}/auth/login`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            credentials: 'include',
+            body: JSON.stringify({ username, password }),
+        });
+
+        if (!res.ok) {
+            const err = await res.json();
+            throw new Error(err.detail || 'Login failed');
+        }
+
+        const data = await res.json();
+        showAuthState(data.user_id, data.role, data.display_name);
+        showSuccess(`Signed in as ${data.display_name}`);
+        checkSystemStatus();
+    } catch (e) {
+        showError(`Login failed: ${e.message}`);
+    }
 }
 
-// Load token from localStorage on page load
-window.addEventListener('DOMContentLoaded', () => {
-    const savedToken = localStorage.getItem('mhras_token');
-    if (savedToken) {
-        authToken = savedToken;
-        document.getElementById('api-token').value = savedToken;
-    }
+async function logoutUser() {
+    try {
+        await fetch(`${API_BASE_URL}/auth/logout`, {
+            method: 'POST',
+            credentials: 'include',
+        });
+    } catch (_) { /* ignore network errors on logout */ }
 
-    // Check system status on load
+    document.getElementById('login-form').style.display = '';
+    document.getElementById('user-info').style.display = 'none';
+    showSuccess('Signed out');
+}
+
+async function checkSession() {
+    try {
+        const res = await fetch(`${API_BASE_URL}/auth/me`, {
+            credentials: 'include',
+        });
+        if (res.ok) {
+            const user = await res.json();
+            showAuthState(user.user_id, user.role, user.display_name);
+        }
+    } catch (_) { /* not logged in */ }
+}
+
+function showAuthState(userId, role, displayName) {
+    document.getElementById('login-form').style.display = 'none';
+    document.getElementById('user-info').style.display = '';
+    document.getElementById('user-display-name').textContent = displayName || userId;
+    const badge = document.getElementById('user-role-badge');
+    badge.textContent = role;
+    badge.className = `risk-badge ${role === 'admin' ? 'moderate' : 'low'}`;
+}
+
+// ── Page load ───────────────────────────────────────────────────────────
+
+window.addEventListener('DOMContentLoaded', () => {
+    checkSession();
     checkSystemStatus();
 });
 
-// Check system status
+// ── System status ───────────────────────────────────────────────────────
+
 async function checkSystemStatus() {
     updateStatusElement('api-status', 'checking', 'Checking...');
     updateStatusElement('models-status', 'checking', 'Checking...');
     updateStatusElement('queue-status', 'checking', 'Checking...');
 
     try {
-        // Check health endpoint
         const healthResponse = await fetch(`${API_BASE_URL}/health`, {
             method: 'GET',
-            headers: getHeaders()
+            credentials: 'include',
+            headers: getHeaders(),
         });
 
         if (healthResponse.ok) {
             const health = await healthResponse.json();
             updateStatusElement('api-status', 'healthy', 'Healthy');
 
-            // Show demo banner if in demo mode
             if (health.mode === 'demo') {
                 document.getElementById('demo-banner').style.display = 'block';
             }
@@ -57,34 +106,37 @@ async function checkSystemStatus() {
     }
 
     try {
-        // Check statistics endpoint
         const statsResponse = await fetch(`${API_BASE_URL}/statistics`, {
             method: 'GET',
-            headers: getHeaders()
+            credentials: 'include',
+            headers: getHeaders(),
         });
 
         if (statsResponse.ok) {
             const stats = await statsResponse.json();
+            const s = stats.screenings || {};
+            const q = stats.review_queue || {};
 
-            if (stats.models) {
-                updateStatusElement('models-status', 'healthy',
-                    `${stats.models.active_count} active / ${stats.models.total_count} total`);
-            } else {
-                updateStatusElement('models-status', 'warning', 'No models');
-            }
+            updateStatusElement('screenings-status', 'healthy',
+                `${s.total || 0} total · avg ${(s.avg_risk_score || 0).toFixed(1)}`);
 
-            if (stats.review_queue) {
-                updateStatusElement('queue-status', 'healthy',
-                    `${stats.review_queue.pending_count} pending`);
-            } else {
-                updateStatusElement('queue-status', 'warning', 'No data');
-            }
+            const hrCount = s.high_risk_count || 0;
+            const hrPct = s.high_risk_pct || 0;
+            updateStatusElement('highrisk-status',
+                hrPct > 20 ? 'warning' : 'healthy',
+                `${hrCount} (${hrPct.toFixed(1)}%)`);
+
+            updateStatusElement('queue-status',
+                (q.pending_count || 0) > 0 ? 'warning' : 'healthy',
+                `${q.pending_count || 0} pending`);
         } else {
-            updateStatusElement('models-status', 'warning', 'Unable to fetch');
+            updateStatusElement('screenings-status', 'warning', 'Unable to fetch');
+            updateStatusElement('highrisk-status', 'warning', 'Unable to fetch');
             updateStatusElement('queue-status', 'warning', 'Unable to fetch');
         }
     } catch (error) {
-        updateStatusElement('models-status', 'error', 'Offline');
+        updateStatusElement('screenings-status', 'error', 'Offline');
+        updateStatusElement('highrisk-status', 'error', 'Offline');
         updateStatusElement('queue-status', 'error', 'Offline');
     }
 }
@@ -97,17 +149,9 @@ function updateStatusElement(id, status, text) {
     }
 }
 
-// Get headers for API requests
+// Get headers for API requests (no Authorization header — cookies handle auth)
 function getHeaders() {
-    const headers = {
-        'Content-Type': 'application/json'
-    };
-
-    if (authToken) {
-        headers['Authorization'] = `Bearer ${authToken}`;
-    }
-
-    return headers;
+    return { 'Content-Type': 'application/json' };
 }
 
 // Submit screening request
@@ -168,6 +212,7 @@ async function submitScreening() {
     try {
         const response = await fetch(`${API_BASE_URL}/screen`, {
             method: 'POST',
+            credentials: 'include',
             headers: getHeaders(),
             body: JSON.stringify(payload)
         });
@@ -229,6 +274,7 @@ async function submitBatchScreening() {
 
         const response = await fetch(`${API_BASE_URL}/batch-screen`, {
             method: 'POST',
+            credentials: 'include',
             headers: getHeaders(),
             body: JSON.stringify(payload)
         });
@@ -494,4 +540,149 @@ function loadSampleScreeningData() {
     document.getElementById('sleep-hours').value = '5.5';
     document.getElementById('avg-heart-rate').value = '78';
     showSuccess('Sample data loaded! Click "Run Risk Assessment" to test.');
+}
+
+
+// ── Clinical Review Queue ───────────────────────────────────────────────
+
+let _selectedReviewId = null;
+
+async function loadReviewQueue() {
+    const filter = document.getElementById('review-status-filter').value;
+    const list = document.getElementById('review-queue-list');
+    list.innerHTML = '<p class="info-text">Loading…</p>';
+
+    try {
+        const res = await fetch(
+            `${API_BASE_URL}/reviews/queue?status_filter=${filter}&limit=50`,
+            { credentials: 'include', headers: getHeaders() },
+        );
+
+        if (res.status === 401 || res.status === 403) {
+            list.innerHTML = '<p class="info-text">Sign in with an <strong>admin</strong> or <strong>reviewer</strong> account to view the queue.</p>';
+            return;
+        }
+
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+
+        const data = await res.json();
+
+        if (!data.reviews || data.reviews.length === 0) {
+            list.innerHTML = `<p class="info-text">No ${filter} reviews.</p>`;
+            document.getElementById('review-detail').style.display = 'none';
+            return;
+        }
+
+        let html = `<p class="info-text" style="margin-bottom:12px;">Showing ${data.reviews.length} ${filter} review(s) · ${data.total_pending} total pending</p>`;
+
+        data.reviews.forEach(r => {
+            const riskClass = (r.risk_level || 'low').toLowerCase();
+            const selected = r.id === _selectedReviewId ? ' review-item--selected' : '';
+            html += `
+                <div class="review-item${selected}" onclick="selectReview('${r.id}', this)" data-review='${JSON.stringify(r).replace(/'/g, "&#39;")}'>
+                    <div class="review-item-header">
+                        <strong>${r.anonymized_id || 'Unknown'}</strong>
+                        <span class="risk-badge ${riskClass}">${r.risk_level || '—'}</span>
+                        <span>Score: ${r.risk_score != null ? r.risk_score.toFixed(1) : '—'}</span>
+                        <span class="review-item-status">${r.status}</span>
+                    </div>
+                    <div class="review-item-meta">
+                        ${r.reviewer ? `Reviewer: ${r.reviewer}` : 'Unassigned'}
+                        · ${new Date(r.created_at).toLocaleString()}
+                    </div>
+                </div>`;
+        });
+
+        list.innerHTML = html;
+
+    } catch (e) {
+        list.innerHTML = `<p class="error-message">Failed to load queue: ${e.message}</p>`;
+    }
+}
+
+function selectReview(id, el) {
+    _selectedReviewId = id;
+    const data = JSON.parse(el.dataset.review);
+
+    document.getElementById('review-detail').style.display = '';
+    document.getElementById('review-detail-id').textContent = id.substring(0, 8) + '…';
+    document.getElementById('review-detail-patient').textContent = data.anonymized_id || '—';
+    document.getElementById('review-detail-risk').textContent = data.risk_level || '—';
+    document.getElementById('review-detail-score').textContent = data.risk_score != null ? data.risk_score.toFixed(1) : '—';
+
+    const badge = document.getElementById('review-detail-status');
+    badge.textContent = data.status;
+    badge.className = `risk-badge ${data.status === 'closed' ? 'low' : data.status === 'reviewed' ? 'moderate' : 'high'}`;
+
+    const commentsEl = document.getElementById('review-detail-comments');
+    if (data.comments) {
+        commentsEl.innerHTML = `<h4>Comments</h4><pre>${data.comments}</pre>`;
+    } else {
+        commentsEl.innerHTML = '<p class="info-text">No comments yet.</p>';
+    }
+
+    document.getElementById('review-assign-input').value = data.reviewer || '';
+    document.getElementById('review-comment-input').value = '';
+
+    // Highlight selected row
+    document.querySelectorAll('.review-item').forEach(item => item.classList.remove('review-item--selected'));
+    el.classList.add('review-item--selected');
+
+    document.getElementById('review-detail').scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+}
+
+async function assignReview() {
+    if (!_selectedReviewId) return;
+    const reviewer = document.getElementById('review-assign-input').value.trim();
+    if (!reviewer) { showError('Enter a reviewer username'); return; }
+
+    try {
+        const res = await fetch(`${API_BASE_URL}/reviews/${_selectedReviewId}/assign`, {
+            method: 'POST',
+            credentials: 'include',
+            headers: getHeaders(),
+            body: JSON.stringify({ reviewer }),
+        });
+        if (!res.ok) { const e = await res.json(); throw new Error(e.detail || res.status); }
+        showSuccess(`Assigned to ${reviewer}`);
+        loadReviewQueue();
+    } catch (e) { showError(`Assign failed: ${e.message}`); }
+}
+
+async function commentReview() {
+    if (!_selectedReviewId) return;
+    const comments = document.getElementById('review-comment-input').value.trim();
+    if (!comments) { showError('Enter a comment'); return; }
+
+    try {
+        const res = await fetch(`${API_BASE_URL}/reviews/${_selectedReviewId}/comment`, {
+            method: 'POST',
+            credentials: 'include',
+            headers: getHeaders(),
+            body: JSON.stringify({ comments }),
+        });
+        if (!res.ok) { const e = await res.json(); throw new Error(e.detail || res.status); }
+        showSuccess('Comment saved');
+        loadReviewQueue();
+    } catch (e) { showError(`Comment failed: ${e.message}`); }
+}
+
+async function closeReview() {
+    if (!_selectedReviewId) return;
+    const comments = document.getElementById('review-comment-input').value.trim();
+
+    try {
+        const body = comments ? { comments } : null;
+        const res = await fetch(`${API_BASE_URL}/reviews/${_selectedReviewId}/close`, {
+            method: 'POST',
+            credentials: 'include',
+            headers: getHeaders(),
+            body: body ? JSON.stringify(body) : undefined,
+        });
+        if (!res.ok) { const e = await res.json(); throw new Error(e.detail || res.status); }
+        showSuccess('Review closed');
+        _selectedReviewId = null;
+        document.getElementById('review-detail').style.display = 'none';
+        loadReviewQueue();
+    } catch (e) { showError(`Close failed: ${e.message}`); }
 }

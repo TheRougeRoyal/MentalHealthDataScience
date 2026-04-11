@@ -18,8 +18,7 @@ from src.api.middleware import (
 )
 from src.api.models import ErrorResponse
 from src.logging_config import setup_logging
-from src.database import Base, engine
-from src import models  # noqa: F401  # Ensure models are registered with Base metadata
+from src.database import init_db, check_health, engine
 
 # Prometheus metrics
 REQUEST_COUNT = Counter(
@@ -228,6 +227,14 @@ async def general_exception_handler(
 # Include routers from endpoints
 app.include_router(endpoints_app.router if hasattr(endpoints_app, 'router') else endpoints_app)
 
+# Include auth endpoints (login, refresh, logout, me)
+from src.api.auth import router as auth_router
+app.include_router(auth_router)
+
+# Include review-workflow endpoints
+from src.api.reviews import router as reviews_router
+app.include_router(reviews_router)
+
 # Include data science endpoints
 from src.api.ds_endpoints import router as ds_router, initialize_ds_components
 app.include_router(ds_router)
@@ -245,8 +252,12 @@ async def startup_event():
     
     logger.info("Starting MHRAS API...")
 
-    # Ensure database tables exist before other services initialize.
-    Base.metadata.create_all(bind=engine)
+    # Create tables (imports models internally).
+    init_db()
+
+    # Verify database connectivity.
+    if not check_health():
+        logger.error("Database health-check failed during startup")
     
     # Initialize integration
     from src.integration import get_integration
@@ -275,6 +286,10 @@ async def shutdown_event():
     
     if _integration:
         _integration.shutdown()
+    
+    # Close all database connections.
+    engine.dispose()
+    logger.info("Database connections closed")
     
     logger.info("MHRAS API shutdown complete")
 

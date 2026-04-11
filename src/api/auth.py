@@ -1,247 +1,325 @@
-"""Authentication and authorization for MHRAS API"""
+"""Authentication and authorization for MHRAS API.
+
+Implements:
+- JWT access + refresh tokens delivered via HTTP-only cookies
+- Role-based access control (admin, reviewer, user)
+- Login / refresh / logout / me endpoints
+- FastAPI dependency for extracting the current user from cookies
+"""
+
+from __future__ import annotations
 
 import logging
-from datetime import datetime, timedelta
-from typing import Dict, Optional
+from datetime import datetime, timedelta, timezone
+from typing import Optional
+
+from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
 from jose import JWTError, jwt
-from pydantic import BaseModel
+from passlib.context import CryptContext
+from pydantic import BaseModel, Field
+
 from src.config import settings
 
 logger = logging.getLogger(__name__)
 
+# ---------------------------------------------------------------------------
+# Configuration from settings
+# ---------------------------------------------------------------------------
 
-class TokenData(BaseModel):
-    """Token payload data"""
-    user_id: str
-    role: str
-    exp: datetime
+_SECRET = settings.security.jwt_secret
+_ALGORITHM = settings.security.jwt_algorithm
+_ACCESS_EXPIRE_MINUTES = 30
+_REFRESH_EXPIRE_DAYS = 7
+
+_COOKIE_ACCESS = "access_token"
+_COOKIE_REFRESH = "refresh_token"
+_COOKIE_SECURE = settings.environment != "development"
+_COOKIE_SAMESITE = "lax"
+
+# ---------------------------------------------------------------------------
+# Password hashing
+# ---------------------------------------------------------------------------
+
+pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+
+# ---------------------------------------------------------------------------
+# Hardcoded user store (swap for a DB table in production)
+# ---------------------------------------------------------------------------
+
+_USERS: dict[str, dict] = {
+    "admin": {
+        "hashed_password": pwd_context.hash("admin"),
+        "role": "admin",
+        "display_name": "System Admin",
+    },
+    "reviewer": {
+        "hashed_password": pwd_context.hash("reviewer"),
+        "role": "reviewer",
+        "display_name": "Clinical Reviewer",
+    },
+}
+
+# ---------------------------------------------------------------------------
+# Pydantic schemas
+# ---------------------------------------------------------------------------
+
+
+class LoginRequest(BaseModel):
+    username: str = Field(..., min_length=1)
+    password: str = Field(..., min_length=1)
 
 
 class AuthResult(BaseModel):
-    """Authentication result"""
+    """Injected into every authenticated endpoint."""
     authenticated: bool
-    user_id: Optional[str] = None
-    role: Optional[str] = None
-    error: Optional[str] = None
+    user_id: str | None = None
+    role: str | None = None
+    error: str | None = None
 
+
+class UserInfo(BaseModel):
+    user_id: str
+    role: str
+    display_name: str
+
+
+# ---------------------------------------------------------------------------
+# Token helpers
+# ---------------------------------------------------------------------------
+
+
+def _create_token(data: dict, expires_delta: timedelta) -> str:
+    payload = data.copy()
+    payload["exp"] = datetime.now(timezone.utc) + expires_delta
+    payload["iat"] = datetime.now(timezone.utc)
+    return jwt.encode(payload, _SECRET, algorithm=_ALGORITHM)
+
+
+def create_access_token(user_id: str, role: str) -> str:
+    return _create_token(
+        {"sub": user_id, "role": role, "type": "access"},
+        timedelta(minutes=_ACCESS_EXPIRE_MINUTES),
+    )
+
+
+def create_refresh_token(user_id: str, role: str) -> str:
+    return _create_token(
+        {"sub": user_id, "role": role, "type": "refresh"},
+        timedelta(days=_REFRESH_EXPIRE_DAYS),
+    )
+
+
+def decode_token(token: str, *, expected_type: str = "access") -> dict:
+    """Decode and validate a JWT. Raises ``HTTPException`` on failure."""
+    try:
+        payload = jwt.decode(token, _SECRET, algorithms=[_ALGORITHM])
+    except jwt.ExpiredSignatureError:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Token has expired",
+        )
+    except JWTError:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid token",
+        )
+
+    if payload.get("type") != expected_type:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail=f"Expected {expected_type} token",
+        )
+
+    return payload
+
+
+# ---------------------------------------------------------------------------
+# Cookie helpers
+# ---------------------------------------------------------------------------
+
+
+def _set_auth_cookies(response: Response, user_id: str, role: str) -> None:
+    """Write access + refresh tokens as HTTP-only cookies."""
+    access = create_access_token(user_id, role)
+    refresh = create_refresh_token(user_id, role)
+
+    response.set_cookie(
+        key=_COOKIE_ACCESS,
+        value=access,
+        httponly=True,
+        secure=_COOKIE_SECURE,
+        samesite=_COOKIE_SAMESITE,
+        max_age=_ACCESS_EXPIRE_MINUTES * 60,
+        path="/",
+    )
+    response.set_cookie(
+        key=_COOKIE_REFRESH,
+        value=refresh,
+        httponly=True,
+        secure=_COOKIE_SECURE,
+        samesite=_COOKIE_SAMESITE,
+        max_age=_REFRESH_EXPIRE_DAYS * 86400,
+        path="/auth/refresh",
+    )
+
+
+def _clear_auth_cookies(response: Response) -> None:
+    response.delete_cookie(_COOKIE_ACCESS, path="/")
+    response.delete_cookie(_COOKIE_REFRESH, path="/auth/refresh")
+
+
+# ---------------------------------------------------------------------------
+# FastAPI dependencies
+# ---------------------------------------------------------------------------
+
+
+def get_current_user(request: Request) -> AuthResult:
+    """Extract the current user from the ``access_token`` cookie.
+
+    In **development** mode, missing cookies fall back to a dev admin
+    identity so the app remains usable without login.
+    """
+    token = request.cookies.get(_COOKIE_ACCESS)
+
+    if not token:
+        if settings.environment == "development":
+            return AuthResult(
+                authenticated=True,
+                user_id="dev_user",
+                role="admin",
+            )
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Not authenticated",
+        )
+
+    payload = decode_token(token, expected_type="access")
+    return AuthResult(
+        authenticated=True,
+        user_id=payload["sub"],
+        role=payload.get("role", "user"),
+    )
+
+
+def require_role(*allowed_roles: str):
+    """Return a dependency that enforces role-based access.
+
+    Usage::
+
+        @router.get("/admin-only", dependencies=[Depends(require_role("admin"))])
+        def admin_view(): ...
+    """
+
+    def _checker(auth: AuthResult = Depends(get_current_user)) -> AuthResult:
+        if auth.role not in allowed_roles:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail=f"Role '{auth.role}' is not allowed. "
+                       f"Required: {', '.join(allowed_roles)}",
+            )
+        return auth
+
+    return _checker
+
+
+# ---------------------------------------------------------------------------
+# Auth router
+# ---------------------------------------------------------------------------
+
+router = APIRouter(prefix="/auth", tags=["Authentication"])
+
+
+@router.post("/login")
+async def login(body: LoginRequest, response: Response):
+    """Authenticate with username/password. Sets HTTP-only cookies."""
+    user_record = _USERS.get(body.username)
+    if not user_record or not pwd_context.verify(
+        body.password, user_record["hashed_password"],
+    ):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid username or password",
+        )
+
+    _set_auth_cookies(response, body.username, user_record["role"])
+    logger.info("User %s logged in (role=%s)", body.username, user_record["role"])
+
+    return {
+        "message": "Login successful",
+        "user_id": body.username,
+        "role": user_record["role"],
+        "display_name": user_record["display_name"],
+    }
+
+
+@router.post("/refresh")
+async def refresh(request: Request, response: Response):
+    """Issue a new access token using the refresh-token cookie."""
+    token = request.cookies.get(_COOKIE_REFRESH)
+    if not token:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="No refresh token",
+        )
+
+    payload = decode_token(token, expected_type="refresh")
+    user_id = payload["sub"]
+    role = payload.get("role", "user")
+
+    # Issue a fresh access cookie (refresh cookie stays valid).
+    access = create_access_token(user_id, role)
+    response.set_cookie(
+        key=_COOKIE_ACCESS,
+        value=access,
+        httponly=True,
+        secure=_COOKIE_SECURE,
+        samesite=_COOKIE_SAMESITE,
+        max_age=_ACCESS_EXPIRE_MINUTES * 60,
+        path="/",
+    )
+
+    logger.info("Access token refreshed for user %s", user_id)
+    return {"message": "Token refreshed"}
+
+
+@router.post("/logout")
+async def logout(response: Response):
+    """Clear authentication cookies."""
+    _clear_auth_cookies(response)
+    return {"message": "Logged out"}
+
+
+@router.get("/me")
+async def me(auth: AuthResult = Depends(get_current_user)):
+    """Return the identity of the currently authenticated user."""
+    user_record = _USERS.get(auth.user_id, {})
+    return UserInfo(
+        user_id=auth.user_id,
+        role=auth.role or "user",
+        display_name=user_record.get("display_name", auth.user_id),
+    )
+
+
+# ---------------------------------------------------------------------------
+# Legacy global (kept for backward compat with older code that imports it)
+# ---------------------------------------------------------------------------
 
 class Authenticator:
-    """
-    Handles JWT token generation, validation, and revocation.
-    
-    Implements token-based authentication with:
-    - JWT token generation with configurable expiration
-    - Token signature verification
-    - Token expiration checks
-    - Token revocation support
-    - Token caching for performance
-    """
-    
-    def __init__(
-        self,
-        secret_key: Optional[str] = None,
-        algorithm: str = "HS256",
-        access_token_expire_minutes: int = 60
-    ):
-        """
-        Initialize authenticator.
-        
-        Args:
-            secret_key: Secret key for JWT signing (defaults to config)
-            algorithm: JWT algorithm (default: HS256)
-            access_token_expire_minutes: Token expiration time in minutes
-        """
-        self.secret_key = secret_key or getattr(settings, 'SECRET_KEY', 'default-secret-key-change-in-production')
-        self.algorithm = algorithm
-        self.access_token_expire_minutes = access_token_expire_minutes
-        
-        # Token revocation list (in production, use Redis or database)
-        self._revoked_tokens: set = set()
-        
-        # Token cache for performance (in production, use Redis)
-        self._token_cache: Dict[str, AuthResult] = {}
-        
-        logger.info("Authenticator initialized")
-    
-    def generate_token(
-        self,
-        user_id: str,
-        role: str = "user",
-        expiry_minutes: Optional[int] = None
-    ) -> str:
-        """
-        Generate a JWT token for a user.
-        
-        Args:
-            user_id: User identifier
-            role: User role (e.g., 'admin', 'clinician', 'user')
-            expiry_minutes: Custom expiration time (overrides default)
-        
-        Returns:
-            JWT token string
-        
-        Example:
-            >>> auth = Authenticator()
-            >>> token = auth.generate_token("user123", role="clinician")
-        """
-        expiry = expiry_minutes or self.access_token_expire_minutes
-        expire = datetime.utcnow() + timedelta(minutes=expiry)
-        
-        payload = {
-            "user_id": user_id,
-            "role": role,
-            "exp": expire,
-            "iat": datetime.utcnow()
-        }
-        
-        token = jwt.encode(payload, self.secret_key, algorithm=self.algorithm)
-        
-        logger.info(f"Generated token for user {user_id} with role {role}")
-        return token
-    
+    """Thin wrapper kept for backward compatibility."""
+
+    def generate_token(self, user_id: str, role: str = "user", **_) -> str:
+        return create_access_token(user_id, role)
+
     def verify_token(self, token: str) -> AuthResult:
-        """
-        Verify a JWT token.
-        
-        Performs:
-        - Signature verification
-        - Expiration check
-        - Revocation check
-        - Cache lookup for performance
-        
-        Args:
-            token: JWT token string
-        
-        Returns:
-            AuthResult with authentication status and user info
-        
-        Example:
-            >>> auth = Authenticator()
-            >>> result = auth.verify_token(token)
-            >>> if result.authenticated:
-            ...     print(f"User {result.user_id} authenticated")
-        """
-        # Check cache first
-        if token in self._token_cache:
-            cached_result = self._token_cache[token]
-            # Verify cached result is still valid (not expired)
-            try:
-                payload = jwt.decode(
-                    token,
-                    self.secret_key,
-                    algorithms=[self.algorithm]
-                )
-                return cached_result
-            except JWTError:
-                # Token expired or invalid, remove from cache
-                del self._token_cache[token]
-        
-        # Check if token is revoked
-        if token in self._revoked_tokens:
-            logger.warning("Attempted use of revoked token")
-            return AuthResult(
-                authenticated=False,
-                error="Token has been revoked"
-            )
-        
         try:
-            # Decode and verify token
-            payload = jwt.decode(
-                token,
-                self.secret_key,
-                algorithms=[self.algorithm]
-            )
-            
-            user_id = payload.get("user_id")
-            role = payload.get("role")
-            
-            if not user_id:
-                logger.warning("Token missing user_id")
-                return AuthResult(
-                    authenticated=False,
-                    error="Invalid token payload"
-                )
-            
-            result = AuthResult(
+            payload = decode_token(token, expected_type="access")
+            return AuthResult(
                 authenticated=True,
-                user_id=user_id,
-                role=role
+                user_id=payload["sub"],
+                role=payload.get("role", "user"),
             )
-            
-            # Cache the result
-            self._token_cache[token] = result
-            
-            logger.debug(f"Token verified for user {user_id}")
-            return result
-            
-        except jwt.ExpiredSignatureError:
-            logger.warning("Token has expired")
-            return AuthResult(
-                authenticated=False,
-                error="Token has expired"
-            )
-        except JWTError as e:
-            logger.warning(f"Token verification failed: {str(e)}")
-            return AuthResult(
-                authenticated=False,
-                error=f"Invalid token: {str(e)}"
-            )
-        except Exception as e:
-            logger.error(f"Unexpected error during token verification: {str(e)}")
-            return AuthResult(
-                authenticated=False,
-                error="Authentication error"
-            )
-    
-    def revoke_token(self, token: str) -> None:
-        """
-        Revoke a token.
-        
-        Adds token to revocation list and removes from cache.
-        In production, this should persist to a database or Redis.
-        
-        Args:
-            token: JWT token to revoke
-        
-        Example:
-            >>> auth = Authenticator()
-            >>> auth.revoke_token(token)
-        """
-        self._revoked_tokens.add(token)
-        
-        # Remove from cache if present
-        if token in self._token_cache:
-            del self._token_cache[token]
-        
-        logger.info("Token revoked")
-    
-    def clear_cache(self) -> None:
-        """
-        Clear the token cache.
-        
-        Useful for testing or when cache needs to be refreshed.
-        """
-        self._token_cache.clear()
-        logger.info("Token cache cleared")
-    
-    def get_cache_size(self) -> int:
-        """
-        Get the current size of the token cache.
-        
-        Returns:
-            Number of cached tokens
-        """
-        return len(self._token_cache)
-    
-    def get_revoked_count(self) -> int:
-        """
-        Get the number of revoked tokens.
-        
-        Returns:
-            Number of revoked tokens
-        """
-        return len(self._revoked_tokens)
+        except HTTPException as exc:
+            return AuthResult(authenticated=False, error=exc.detail)
 
 
-# Global authenticator instance
 authenticator = Authenticator()

@@ -1,171 +1,199 @@
 # Mental Health Risk Assessment System (MHRAS)
 
-[![Deploy with Vercel](https://vercel.com/button)](https://vercel.com/new/clone?repository-url=https://github.com/YOUR_USERNAME/MentalHealthDataScience)
-[![License](https://img.shields.io/badge/license-Proprietary-red.svg)](LICENSE)
 [![Python](https://img.shields.io/badge/Python-3.11-blue.svg)](https://python.org)
 [![FastAPI](https://img.shields.io/badge/FastAPI-0.100+-green.svg)](https://fastapi.tiangolo.com)
+[![License](https://img.shields.io/badge/license-Proprietary-red.svg)](LICENSE)
 
-A comprehensive mental health screening system with ML-powered risk assessment, clinical decision support, and resource recommendations.
+A clinical-grade mental health screening platform with structured risk modelling, explainable assessments, role-gated review workflows, and resource recommendations.
 
-**[Live Demo →](https://your-project.vercel.app)**
+---
 
-## Features
+## Architecture
 
-- **Mental Health Screening** - PHQ-9, GAD-7, wearable data, EMR integration
-- **ML Risk Assessment** - Ensemble models (Logistic Regression, LightGBM)
-- **Interpretable Predictions** - SHAP values, counterfactuals, clinical explanations
-- **Resource Recommendations** - Crisis lines, therapy, support groups
-- **Demo Mode** - Full UI with simulated predictions for testing
-- **Batch Processing** - Screen up to 100 individuals at once
+| Layer | Technology | Deployment |
+|-------|-----------|------------|
+| **Frontend** | HTML 5, CSS 3, Vanilla JS | **Vercel** (static) |
+| **Backend API** | FastAPI, Python 3.11 | **Railway** / Docker |
+| **Database** | PostgreSQL (prod) · SQLite (dev) | Railway Postgres / local |
+| **Auth** | JWT via HTTP-only cookies | — |
+| **Risk Model** | Modular model layer (clinical rules, future ML) | — |
 
-## Tech Stack
+```
+Frontend (Vercel)              Backend (Railway / Docker)
+  index.html                     ┌─ FastAPI ─────────────────┐
+  app.js   ──── fetch() ────→   │  /screen                  │
+  styles.css                     │  /risk-score/{id}         │
+                                 │  /explain                 │
+                                 │  /batch-screen            │
+                                 │  /statistics              │
+                                 │  /reviews/*               │
+                                 │  /auth/*                  │
+                                 └──── PostgreSQL ───────────┘
+```
 
-| Layer | Technologies |
-|-------|-------------|
-| Frontend | HTML5, CSS3, Vanilla JavaScript |
-| Backend | FastAPI, Python 3.11 |
-| ML | scikit-learn, LightGBM, SHAP |
-| Database | PostgreSQL, Redis |
-| Deployment | Vercel (serverless), Docker, Kubernetes |
+---
 
 ## Quick Start
 
-### Option 1: Deploy to Vercel (Recommended)
-
-1. Click the **Deploy with Vercel** button above
-2. Fork or clone the repository
-3. Deploy - works immediately in **Demo Mode**
-
-### Option 2: Local Development
+### 1. Clone & install
 
 ```bash
-# Clone the repository
 git clone https://github.com/YOUR_USERNAME/MentalHealthDataScience.git
 cd MentalHealthDataScience
+python -m venv .venv && source .venv/bin/activate
+pip install -r requirements.txt
+```
 
-# Run frontend (quickest)
+### 2. Configure
+
+```bash
+cp .env.example .env
+# Edit .env — at minimum set:
+#   SECURITY_JWT_SECRET=<random-string>
+#   DATABASE_URL=         (leave blank for SQLite fallback)
+#   ENVIRONMENT=development
+```
+
+### 3. Run locally
+
+```bash
+# Backend API (auto-creates tables on startup)
+uvicorn src.api.app:app --reload --port 8000
+
+# Frontend (separate terminal)
 python -m http.server 3000
 # Open http://localhost:3000
 ```
 
-### Option 3: Full Stack with Docker
+### 4. Run tests
 
 ```bash
-# Start all services
-docker-compose up
-
-# Initialize database
-./setup_database.sh
-
-# API at http://localhost:8000
-# Docs at http://localhost:8000/docs
+pytest tests/test_api_endpoints.py -v
 ```
 
-## Demo Mode
+---
 
-The system runs in **Demo Mode** by default on Vercel, providing:
+## Production Deployment
 
-- Simulated risk predictions based on PHQ-9 and GAD-7 scores
-- Full UI functionality for demonstrations
-- Sample data buttons for quick testing
+### Backend → Railway
 
-### Demo Features
+1. Connect your GitHub repo to [Railway](https://railway.app).
+2. Railway auto-detects the `Dockerfile` or uses Nixpacks via `railway.json`.
+3. Set environment variables in the Railway dashboard (see table below).
+4. Provision a **Railway Postgres** add-on — set `DATABASE_URL` automatically.
+5. Health check: `/health`
 
-- **Load Sample Data** - Pre-fill forms with realistic patient data
-- **Batch Screening** - Test with multiple patients at once
-- **Risk Visualization** - See risk scores, contributing factors, and recommendations
+### Backend → Docker
+
+```bash
+docker build -t mhras-api .
+docker run -p 8000:8000 \
+  -e DATABASE_URL=postgresql://user:pass@host/db \
+  -e SECURITY_JWT_SECRET=change-me \
+  -e ENVIRONMENT=production \
+  mhras-api
+```
+
+### Frontend → Vercel
+
+1. Import the repo to [Vercel](https://vercel.com).
+2. Set **Framework Preset** to `Other`.
+3. Set **Output Directory** to `.` (root).
+4. Vercel serves `index.html`, `app.js`, `styles.css` as static files.
+5. In `app.js`, set `API_BASE_URL` to  your Railway backend URL.
+
+---
+
+## Environment Variables
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `ENVIRONMENT` | `development` | `development` or `production` |
+| `DATABASE_URL` | _(SQLite fallback)_ | PostgreSQL connection string |
+| `SECURITY_JWT_SECRET` | `change-me-in-production` | JWT signing key |
+| `SECURITY_JWT_ALGORITHM` | `HS256` | JWT algorithm |
+| `ML_RISK_THRESHOLD_HIGH` | `51.0` | Score threshold for "high" risk |
+| `ML_RISK_THRESHOLD_CRITICAL` | `75.0` | Score threshold for "critical" risk |
+| `GOVERNANCE_HUMAN_REVIEW_THRESHOLD` | `75.0` | Score requiring human review |
+| `LOG_LEVEL` | `INFO` | Logging level |
+| `LOG_FORMAT` | `json` | `json` (structured) or `text` |
+
+See [.env.example](.env.example) for the full list.
+
+---
 
 ## API Endpoints
 
-| Endpoint | Method | Description |
-|----------|--------|-------------|
-| `/api/health` | GET | System health check |
-| `/api/statistics` | GET | Model and queue statistics |
-| `/api/screen` | POST | Single patient screening |
-| `/api/batch-screen` | POST | Batch screening (max 100) |
+| Endpoint | Method | Auth | Description |
+|----------|--------|------|-------------|
+| `/health` | GET | — | Health check |
+| `/` | GET | — | Service info |
+| `/auth/login` | POST | — | Login (returns HTTP-only cookie) |
+| `/auth/refresh` | POST | cookie | Refresh token |
+| `/auth/logout` | POST | cookie | Clear session |
+| `/auth/me` | GET | cookie | Current user info |
+| `/screen` | POST | cookie | Single screening |
+| `/batch-screen` | POST | cookie | Batch screening (≤100) |
+| `/risk-score/{id}` | GET | cookie | Retrieve risk score by patient ID |
+| `/explain` | POST | cookie | Retrieve/generate explanation |
+| `/statistics` | GET | cookie | DB-backed system stats |
+| `/reviews/queue` | GET | admin/reviewer | Review queue |
+| `/reviews/{id}/assign` | POST | admin/reviewer | Assign reviewer |
+| `/reviews/{id}/comment` | POST | admin/reviewer | Add comment |
+| `/reviews/{id}/close` | POST | admin/reviewer | Close review |
 
-### Example Request
-
-```bash
-curl -X POST https://your-project.vercel.app/api/screen \
-  -H "Content-Type: application/json" \
-  -d '{
-    "anonymized_id": "patient_001",
-    "consent_verified": true,
-    "survey_data": {
-      "phq9_score": 15,
-      "gad7_score": 12
-    }
-  }'
-```
-
-## Architecture
-
-```
-Vercel (Frontend + Serverless)
-├── index.html, app.js, styles.css
-└── api/
-    ├── health.js      - Health check
-    ├── statistics.js   - System stats
-    ├── screen.js       - Single screening
-    ├── batch-screen.js - Batch screening
-    └── index.js        - API info
-         │
-         ▼ (optional proxy)
-    FastAPI Backend
-    ├── ML Models (LightGBM)
-    ├── PostgreSQL
-    └── Redis
-```
+---
 
 ## Project Structure
 
 ```
-├── api/                    # Vercel serverless functions
-├── src/                    # Backend source code
-│   ├── api/               # FastAPI endpoints
-│   ├── ds/                # Data science modules
-│   ├── governance/        # Compliance & audit
-│   └── database/          # Database models
-├── tests/                 # Test suite
-├── monitoring/            # Prometheus + Grafana configs
-├── k8s/                   # Kubernetes manifests
-└── examples/             # Example notebooks
+├── index.html / app.js / styles.css   # Frontend
+├── src/
+│   ├── api/
+│   │   ├── app.py                     # FastAPI application
+│   │   ├── endpoints.py               # Core API routes
+│   │   ├── auth.py                    # JWT + cookie auth
+│   │   ├── reviews.py                 # Review workflow routes
+│   │   ├── middleware.py              # Logging, error handling
+│   │   └── models.py                  # Pydantic schemas
+│   ├── risk_model.py                  # Structured model layer (ABC + rules)
+│   ├── database.py                    # SQLAlchemy engine + session
+│   ├── models.py                      # ORM models
+│   ├── config.py                      # Env-based settings
+│   └── logging_config.py             # Structured logging (structlog)
+├── tests/
+│   ├── conftest.py                    # Fixtures (in-memory DB, auth overrides)
+│   └── test_api_endpoints.py          # Endpoint tests
+├── Dockerfile                         # Multi-stage production image
+├── railway.json                       # Railway deploy config
+├── vercel.json                        # Vercel static deploy config
+├── .env.example                       # All env vars documented
+└── requirements.txt
 ```
 
-## Configuration
-
-### Environment Variables
-
-| Variable | Required | Description |
-|----------|----------|-------------|
-| `MHRAS_API_URL` | No | Backend URL for full-stack mode |
-
-For full-stack deployment, set these additional variables:
-| Variable | Description |
-|----------|-------------|
-| `DB_HOST` | PostgreSQL host |
-| `DB_PASSWORD` | Database password |
-| `REDIS_URL` | Redis connection URL |
+---
 
 ## Testing
 
 ```bash
-# Run all tests
-pytest tests/
+# All API endpoint tests
+pytest tests/test_api_endpoints.py -v
 
-# Run with coverage
+# Full suite with coverage
 pytest --cov=src tests/
 
-# Run specific test
-pytest tests/test_screening_service.py -v
+# Specific test class
+pytest tests/test_api_endpoints.py::TestReviews -v
 ```
+
+Tests use an **in-memory SQLite** database and override auth dependencies — no external services required.
+
+---
 
 ## Author
 
-**Aakash Raj**
-- GitHub: [@aakashraj](https://github.com/aakashraj)
+**Aakash Raj** · [GitHub](https://github.com/aakashraj)
 
 ## License
 
-Proprietary - For authorized clinical use only.
+Proprietary — for authorized clinical use only.

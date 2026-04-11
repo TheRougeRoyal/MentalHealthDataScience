@@ -51,15 +51,23 @@ class RequestLoggingMiddleware(BaseHTTPMiddleware):
         Returns:
             Response from endpoint
         """
-        # Generate request ID
+        import structlog
+        # Generate request ID and bind to structlog contextvars so all
+        # downstream loggers automatically include it.
         request_id = str(uuid.uuid4())
         request.state.request_id = request_id
+        structlog.contextvars.clear_contextvars()
+        structlog.contextvars.bind_contextvars(
+            request_id=request_id,
+            method=request.method,
+            path=request.url.path,
+        )
         
         # Log request
         start_time = time.time()
         
         logger.info(
-            f"Request started",
+            "Request started",
             extra={
                 "request_id": request_id,
                 "method": request.method,
@@ -78,7 +86,7 @@ class RequestLoggingMiddleware(BaseHTTPMiddleware):
             
             # Log response
             logger.info(
-                f"Request completed",
+                "Request completed",
                 extra={
                     "request_id": request_id,
                     "method": request.method,
@@ -98,7 +106,7 @@ class RequestLoggingMiddleware(BaseHTTPMiddleware):
             elapsed_time = time.time() - start_time
             
             logger.error(
-                f"Request failed",
+                "Request failed",
                 extra={
                     "request_id": request_id,
                     "method": request.method,
@@ -110,6 +118,8 @@ class RequestLoggingMiddleware(BaseHTTPMiddleware):
             )
             
             raise
+        finally:
+            structlog.contextvars.clear_contextvars()
 
 
 class AuthenticationMiddleware(BaseHTTPMiddleware):
