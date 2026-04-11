@@ -5,7 +5,7 @@ from datetime import datetime
 from typing import List, Optional, Dict, Any
 from uuid import UUID
 
-from src.database.connection import DatabaseConnection
+from src.database_legacy.connection import DatabaseConnection
 from src.ds.models import Experiment, Run, Metric, Artifact
 
 logger = logging.getLogger(__name__)

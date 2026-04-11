@@ -56,8 +56,8 @@ def _build_database_url() -> str:
         return explicit_url
 
     db = settings.database
-    if db.host and db.user and db.name:
-        password = quote_plus(db.password) if db.password else ""
+    if db.password and db.host and db.user and db.name:
+        password = quote_plus(db.password)
         return (
             f"postgresql+psycopg2://{db.user}:{password}"
             f"@{db.host}:{db.port}/{db.name}"

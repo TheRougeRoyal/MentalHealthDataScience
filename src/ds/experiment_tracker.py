@@ -8,7 +8,7 @@ from typing import Optional, Dict, Any, List
 from uuid import UUID
 import pandas as pd
 
-from src.database.connection import DatabaseConnection
+from src.database_legacy.connection import DatabaseConnection
 from src.ds.storage import StorageBackend
 from src.ds.repositories import ExperimentRepository
 from src.ds.models import Experiment, Run, Metric, Artifact

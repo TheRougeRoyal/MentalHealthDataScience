@@ -9,8 +9,8 @@ from typing import Optional
 import json
 
 from src.integration import get_integration, reset_integration
-from src.database.connection import DatabaseConnection
-from src.database.migration_runner import MigrationRunner
+from src.database_legacy.connection import DatabaseConnection
+from src.database_legacy.migration_runner import MigrationRunner
 from src.screening_service import ScreeningRequest
 from src.logging_config import setup_logging, get_logger
 

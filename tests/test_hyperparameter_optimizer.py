@@ -12,7 +12,7 @@ from src.ds.hyperparameter_optimizer import (
 )
 from src.ds.experiment_tracker import ExperimentTracker
 from src.ds.storage import FileSystemStorage
-from src.database.connection import DatabaseConnection
+from src.database_legacy.connection import DatabaseConnection
 
 
 @pytest.fixture

@@ -5,8 +5,8 @@ from datetime import datetime
 from typing import List, Optional, Dict, Any
 from uuid import UUID
 
-from src.database.connection import DatabaseConnection
-from src.database.models import Prediction, AuditLog, Consent, HumanReviewCase
+from src.database_legacy.connection import DatabaseConnection
+from src.database_legacy.models import Prediction, AuditLog, Consent, HumanReviewCase
 
 logger = logging.getLogger(__name__)
 

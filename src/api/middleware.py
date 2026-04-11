@@ -127,7 +127,7 @@ class AuthenticationMiddleware(BaseHTTPMiddleware):
     Middleware for authentication on protected endpoints.
     
     Note: This is a placeholder. Actual authentication is handled
-    by the verify_authentication dependency in endpoints.
+    by the get_current_user dependency in endpoints.
     This middleware can be used for additional auth-related processing.
     """
     

@@ -9,8 +9,8 @@ import logging
 from typing import Optional, Dict, Any
 from datetime import datetime
 
-from src.database.connection import DatabaseConnection
-from src.database.repositories import (
+from src.database_legacy.connection import DatabaseConnection
+from src.database_legacy.repositories import (
     PredictionRepository,
     AuditLogRepository,
     ConsentRepository,

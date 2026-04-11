@@ -12,7 +12,7 @@ import numpy as np
 from scipy import stats
 from pydantic import BaseModel, Field
 
-from src.database.connection import DatabaseConnection
+from src.database_legacy.connection import DatabaseConnection
 from src.ds.storage import StorageBackend
 
 logger = logging.getLogger(__name__)

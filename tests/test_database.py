@@ -4,7 +4,7 @@ import pytest
 from datetime import datetime, timedelta
 from uuid import uuid4
 
-from src.database.models import Prediction, AuditLog, Consent, HumanReviewCase
+from src.database_legacy.models import Prediction, AuditLog, Consent, HumanReviewCase
 
 
 class TestDatabaseModels:

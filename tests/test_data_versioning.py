@@ -16,7 +16,7 @@ from src.ds.data_versioning import (
     DataVersionRepository
 )
 from src.ds.storage import FileSystemStorage
-from src.database.connection import DatabaseConnection
+from src.database_legacy.connection import DatabaseConnection
 
 
 @pytest.fixture

@@ -6,8 +6,8 @@ import json
 import logging
 from typing import Dict, Any
 
-from src.database.connection import DatabaseConnection
-from src.database.repositories import ResourceRepository
+from src.database_legacy.connection import DatabaseConnection
+from src.database_legacy.repositories import ResourceRepository
 from src.recommendations.resource_catalog import ResourceCatalog
 
 logger = logging.getLogger(__name__)

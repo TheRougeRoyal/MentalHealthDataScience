@@ -11,7 +11,7 @@ from src.ds.models import Experiment, Run, Metric, Artifact
 from src.ds.repositories import ExperimentRepository
 from src.ds.experiment_tracker import ExperimentTracker
 from src.ds.storage import FileSystemStorage
-from src.database.connection import DatabaseConnection
+from src.database_legacy.connection import DatabaseConnection
 
 
 class TestExperimentModels:

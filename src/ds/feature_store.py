@@ -9,7 +9,7 @@ from uuid import UUID
 import pandas as pd
 from pydantic import BaseModel, Field, field_validator
 
-from src.database.connection import DatabaseConnection
+from src.database_legacy.connection import DatabaseConnection
 from src.config import settings
 from src.exceptions import ValidationError
 

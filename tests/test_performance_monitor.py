@@ -16,7 +16,7 @@ from src.ds.performance_monitor import (
     AlertNotifier,
     PerformanceReporter
 )
-from src.database.connection import DatabaseConnection
+from src.database_legacy.connection import DatabaseConnection
 from src.ml.model_registry import ModelRegistry
 from src.ds.storage import FileSystemStorage
 

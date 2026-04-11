@@ -23,7 +23,7 @@ from src.api.ds_models import (
     ModelCardGenerateRequest, ModelCardResponse
 )
 from src.api.auth import AuthResult, authenticator
-from src.api.endpoints import verify_authentication
+from src.api.auth import get_current_user
 from src.ds.experiment_tracker import ExperimentTracker
 from src.ds.data_versioning import DataVersionControl
 from src.ds.feature_store import FeatureStore
@@ -31,7 +31,7 @@ from src.ds.eda import EDAModule
 from src.ds.model_cards import ModelCardGenerator
 from src.ds.storage import FileSystemStorage
 from src.ml.model_registry import ModelRegistry
-from src.database.connection import get_db_connection
+from src.database_legacy.connection import get_db_connection
 
 logger = logging.getLogger(__name__)
 
@@ -88,7 +88,7 @@ def initialize_ds_components():
 )
 async def create_experiment(
     request: ExperimentCreate,
-    auth: AuthResult = Depends(verify_authentication)
+    auth: AuthResult = Depends(get_current_user)
 ) -> ExperimentResponse:
     """
     Create a new experiment for tracking ML runs.
@@ -137,7 +137,7 @@ async def create_experiment(
     summary="List all experiments"
 )
 async def list_experiments(
-    auth: AuthResult = Depends(verify_authentication),
+    auth: AuthResult = Depends(get_current_user),
     limit: int = 100
 ) -> List[ExperimentResponse]:
     """
@@ -184,7 +184,7 @@ async def list_experiments(
 )
 async def get_experiment(
     experiment_id: str,
-    auth: AuthResult = Depends(verify_authentication)
+    auth: AuthResult = Depends(get_current_user)
 ) -> ExperimentResponse:
     """
     Get experiment details by ID.
@@ -237,7 +237,7 @@ async def get_experiment(
 async def create_run(
     experiment_id: str,
     request: RunCreate,
-    auth: AuthResult = Depends(verify_authentication)
+    auth: AuthResult = Depends(get_current_user)
 ) -> RunResponse:
     """
     Create a new run within an experiment.
@@ -293,7 +293,7 @@ async def create_run(
 async def log_metrics(
     run_id: str,
     request: MetricLog,
-    auth: AuthResult = Depends(verify_authentication)
+    auth: AuthResult = Depends(get_current_user)
 ):
     """
     Log metrics for a specific run.
@@ -336,7 +336,7 @@ async def log_metrics(
 async def log_params(
     run_id: str,
     request: ParamLog,
-    auth: AuthResult = Depends(verify_authentication)
+    auth: AuthResult = Depends(get_current_user)
 ):
     """
     Log parameters for a specific run.
@@ -378,7 +378,7 @@ async def log_params(
 async def log_artifact(
     run_id: str,
     request: ArtifactLog,
-    auth: AuthResult = Depends(verify_authentication)
+    auth: AuthResult = Depends(get_current_user)
 ):
     """
     Log an artifact for a specific run.
@@ -425,7 +425,7 @@ async def log_artifact(
 )
 async def search_runs(
     request: RunSearchRequest,
-    auth: AuthResult = Depends(verify_authentication)
+    auth: AuthResult = Depends(get_current_user)
 ) -> List[RunResponse]:
     """
     Search and filter runs.
@@ -479,7 +479,7 @@ async def search_runs(
 )
 async def compare_runs(
     request: RunCompareRequest,
-    auth: AuthResult = Depends(verify_authentication)
+    auth: AuthResult = Depends(get_current_user)
 ):
     """
     Compare metrics across multiple runs.
@@ -531,7 +531,7 @@ async def compare_runs(
 )
 async def register_dataset(
     request: DatasetRegister,
-    auth: AuthResult = Depends(verify_authentication)
+    auth: AuthResult = Depends(get_current_user)
 ) -> DatasetVersionResponse:
     """
     Register a new dataset version.
@@ -588,7 +588,7 @@ async def register_dataset(
 )
 async def list_dataset_versions(
     dataset_name: str,
-    auth: AuthResult = Depends(verify_authentication)
+    auth: AuthResult = Depends(get_current_user)
 ) -> List[DatasetVersionResponse]:
     """
     List all versions of a dataset.
@@ -637,7 +637,7 @@ async def list_dataset_versions(
 async def get_dataset_lineage(
     version_id: str,
     direction: str = "upstream",
-    auth: AuthResult = Depends(verify_authentication)
+    auth: AuthResult = Depends(get_current_user)
 ):
     """
     Get dataset lineage (upstream or downstream).
@@ -695,7 +695,7 @@ async def get_dataset_lineage(
 )
 async def check_drift(
     request: DriftCheckRequest,
-    auth: AuthResult = Depends(verify_authentication)
+    auth: AuthResult = Depends(get_current_user)
 ) -> DriftReportResponse:
     """
     Check for data drift between two dataset versions.
@@ -752,7 +752,7 @@ async def check_drift(
 )
 async def register_feature(
     request: FeatureRegister,
-    auth: AuthResult = Depends(verify_authentication)
+    auth: AuthResult = Depends(get_current_user)
 ) -> FeatureResponse:
     """
     Register a new feature in the feature store.
@@ -817,7 +817,7 @@ async def register_feature(
     summary="List all features"
 )
 async def list_features(
-    auth: AuthResult = Depends(verify_authentication),
+    auth: AuthResult = Depends(get_current_user),
     limit: int = 100
 ) -> List[FeatureResponse]:
     """
@@ -865,7 +865,7 @@ async def list_features(
 )
 async def get_feature(
     feature_name: str,
-    auth: AuthResult = Depends(verify_authentication)
+    auth: AuthResult = Depends(get_current_user)
 ) -> FeatureResponse:
     """
     Get feature details by name.
@@ -916,7 +916,7 @@ async def get_feature(
 )
 async def compute_features(
     request: FeatureComputeRequest,
-    auth: AuthResult = Depends(verify_authentication)
+    auth: AuthResult = Depends(get_current_user)
 ):
     """
     Compute features from input data.
@@ -964,7 +964,7 @@ async def compute_features(
 async def serve_features(
     feature_names: str,
     entity_ids: str,
-    auth: AuthResult = Depends(verify_authentication)
+    auth: AuthResult = Depends(get_current_user)
 ):
     """
     Serve features for online inference.
@@ -1020,7 +1020,7 @@ async def serve_features(
 )
 async def analyze_dataset(
     request: EDAAnalyzeRequest,
-    auth: AuthResult = Depends(verify_authentication)
+    auth: AuthResult = Depends(get_current_user)
 ) -> EDAReportResponse:
     """
     Run exploratory data analysis on a dataset.
@@ -1085,7 +1085,7 @@ async def analyze_dataset(
 )
 async def get_eda_report(
     report_id: str,
-    auth: AuthResult = Depends(verify_authentication)
+    auth: AuthResult = Depends(get_current_user)
 ):
     """
     Get a previously generated EDA report.
@@ -1121,7 +1121,7 @@ async def get_eda_report(
 )
 async def generate_model_card(
     request: ModelCardGenerateRequest,
-    auth: AuthResult = Depends(verify_authentication)
+    auth: AuthResult = Depends(get_current_user)
 ) -> ModelCardResponse:
     """
     Generate a model card for a trained model.
@@ -1177,7 +1177,7 @@ async def generate_model_card(
 )
 async def get_model_card(
     card_id: str,
-    auth: AuthResult = Depends(verify_authentication)
+    auth: AuthResult = Depends(get_current_user)
 ):
     """
     Get a previously generated model card.

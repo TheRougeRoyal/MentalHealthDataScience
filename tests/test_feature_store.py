@@ -17,7 +17,7 @@ from src.ds.feature_store import (
     RedisCache,
 )
 from src.exceptions import ValidationError
-from src.database.connection import DatabaseConnection
+from src.database_legacy.connection import DatabaseConnection
 
 
 class TestFeatureDefinition:

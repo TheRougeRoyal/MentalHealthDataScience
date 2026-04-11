@@ -24,7 +24,7 @@ matplotlib.use('Agg')  # Non-interactive backend
 import matplotlib.pyplot as plt
 import seaborn as sns
 
-from src.database.connection import DatabaseConnection
+from src.database_legacy.connection import DatabaseConnection
 from src.governance.drift_monitor import DriftMonitor, DriftReport
 from src.ml.model_registry import ModelRegistry
 from src.logging_config import get_logger

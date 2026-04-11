@@ -11,7 +11,7 @@ from IPython.core.magic_arguments import (
 )
 from IPython import get_ipython
 
-from src.database.connection import DatabaseConnection
+from src.database_legacy.connection import DatabaseConnection
 from src.ds.storage import FileSystemStorage
 from src.ds.experiment_tracker import ExperimentTracker
 from src.ds.notebook_integration import NotebookTracker
