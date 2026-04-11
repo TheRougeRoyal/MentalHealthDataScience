@@ -18,6 +18,8 @@ from src.api.middleware import (
 )
 from src.api.models import ErrorResponse
 from src.logging_config import setup_logging
+from src.database import Base, engine
+from src import models  # noqa: F401  # Ensure models are registered with Base metadata
 
 # Prometheus metrics
 REQUEST_COUNT = Counter(
@@ -242,6 +244,9 @@ async def startup_event():
     global _integration
     
     logger.info("Starting MHRAS API...")
+
+    # Ensure database tables exist before other services initialize.
+    Base.metadata.create_all(bind=engine)
     
     # Initialize integration
     from src.integration import get_integration
