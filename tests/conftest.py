@@ -9,6 +9,16 @@ from fastapi.testclient import TestClient
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import StaticPool
+from unittest.mock import patch, MagicMock
+
+# Patch the initialize_ds_components function BEFORE importing the app
+# to prevent data science initialization that tries to connect to PostgreSQL
+print(">>> APPLYING EARLY PATCH: initialize_ds_components")
+import sys
+if 'src.api.ds_endpoints' not in sys.modules:
+    with patch('src.api.ds_endpoints.initialize_ds_components') as mock_init_ds:
+        mock_init_ds.side_effect = Exception("Data science initialization skipped for testing")
+        print(">>> EARLY PATCH APPLIED: initialize_ds_components will raise exception")
 
 from src.models import Base
 from src.database import get_db

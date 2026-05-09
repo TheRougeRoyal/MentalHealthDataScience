@@ -1,8 +1,6 @@
 // Vercel Serverless Function: /api/screen
 // Proxies to FastAPI backend when MHRAS_API_URL is configured
 
-const MHRAS_API_URL = process.env.MHRAS_API_URL || 'http://localhost:8000';
-
 const getFetch = () => {
   if (typeof fetch !== 'undefined') return fetch;
   if (typeof global !== 'undefined' && typeof global.fetch !== 'undefined') return global.fetch;
@@ -42,7 +40,8 @@ module.exports = async (req, res) => {
     }
 
     // If backend URL is configured, proxy to FastAPI
-    if (process.env.MHRAS_API_URL) {
+    const MHRAS_API_URL = process.env.MHRAS_API_URL;
+    if (MHRAS_API_URL) {
       const fetchFn = getFetch();
       if (!fetchFn) {
         return res.status(500).json({ error: 'Fetch API unavailable. Ensure Node 18+ runtime or add node-fetch dependency.' });

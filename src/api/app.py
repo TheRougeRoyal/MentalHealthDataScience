@@ -130,7 +130,7 @@ async def validation_exception_handler(
         f"Validation error",
         extra={
             "request_id": request_id,
-            "errors": errors
+            "validation_errors": errors
         }
     )
     
@@ -139,10 +139,10 @@ async def validation_exception_handler(
         message="Request validation failed",
         details={"validation_errors": errors}
     )
-    
+
     return JSONResponse(
         status_code=status.HTTP_400_BAD_REQUEST,
-        content=error_response.model_dump(),
+        content=error_response.model_dump(mode='json'),
         headers={"X-Request-ID": request_id}
     )
 
@@ -177,10 +177,10 @@ async def pydantic_validation_exception_handler(
         message="Data validation failed",
         details={"error": str(exc)}
     )
-    
+
     return JSONResponse(
         status_code=status.HTTP_400_BAD_REQUEST,
-        content=error_response.model_dump(),
+        content=error_response.model_dump(mode='json'),
         headers={"X-Request-ID": request_id}
     )
 
@@ -219,7 +219,7 @@ async def general_exception_handler(
     
     return JSONResponse(
         status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-        content=error_response.model_dump(),
+        content=error_response.model_dump(mode='json'),
         headers={"X-Request-ID": request_id}
     )
 

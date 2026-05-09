@@ -1,8 +1,6 @@
 // Vercel Serverless Function: /api/batch-screen
 // Batch screening endpoint
 
-const MHRAS_API_URL = process.env.MHRAS_API_URL || 'http://localhost:8000';
-
 const getFetch = () => {
   if (typeof fetch !== 'undefined') return fetch;
   if (typeof global !== 'undefined' && typeof global.fetch !== 'undefined') return global.fetch;
@@ -14,6 +12,7 @@ const getFetch = () => {
 };
 
 module.exports = async (req, res) => {
+  // Only allow POST
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'Method not allowed' });
   }
@@ -31,18 +30,36 @@ module.exports = async (req, res) => {
       return res.status(400).json({ error: 'Request body must be JSON' });
     }
 
-    const { requests } = requestBody;
-
-    if (!requests || !Array.isArray(requests)) {
-      return res.status(400).json({ error: 'requests array is required' });
+    // Validate required fields
+    if (!Array.isArray(requestBody.requests)) {
+      return res.status(400).json({ error: 'requests must be an array' });
     }
 
-    if (requests.length > 100) {
-      return res.status(400).json({ error: 'Maximum 100 requests per batch' });
+    if (requestBody.requests.length === 0) {
+      return res.status(200).json({ results: [], total: 0, successful: 0, failed: 0 });
     }
 
-    // Proxy to backend if configured
-    if (process.env.MHRAS_API_URL) {
+    if (requestBody.requests.length > 100) {
+      return res.status(400).json({ error: 'Maximum 100 requests allowed per batch' });
+    }
+
+    // Validate each request
+    for (let i = 0; i < requestBody.requests.length; i++) {
+      const request = requestBody.requests[i];
+      if (!request || typeof request !== 'object') {
+        return res.status(400).json({ error: `Request at index ${i} must be a JSON object` });
+      }
+      if (!request.anonymized_id) {
+        return res.status(400).json({ error: `anonymized_id is required for request at index ${i}` });
+      }
+      if (!request.consent_verified) {
+        return res.status(403).json({ error: `Consent must be verified for request at index ${i}` });
+      }
+    }
+
+    // If backend URL is configured, proxy to FastAPI
+    const MHRAS_API_URL = process.env.MHRAS_API_URL;
+    if (MHRAS_API_URL) {
       const fetchFn = getFetch();
       if (!fetchFn) {
         return res.status(500).json({ error: 'Fetch API unavailable. Ensure Node 18+ runtime or add node-fetch dependency.' });
@@ -54,7 +71,7 @@ module.exports = async (req, res) => {
           'Content-Type': 'application/json',
           ...(req.headers.authorization && { Authorization: req.headers.authorization })
         },
-        body: JSON.stringify({ requests })
+        body: JSON.stringify(requestBody)
       });
 
       if (!backendResponse.ok) {
@@ -66,17 +83,18 @@ module.exports = async (req, res) => {
       return res.status(200).json(data);
     }
 
-    // Demo mode: return simulated responses
+    // Demo mode: return simulated responses when no backend is configured
     const results = [];
     let successful = 0;
     let failed = 0;
 
-    for (const request of requests) {
+    for (const request of requestBody.requests) {
       try {
         const surveyData = request.survey_data || {};
         const phq9Score = surveyData.phq9_score || 0;
         const gad7Score = surveyData.gad7_score || 0;
 
+        // Calculate simulated risk score
         let riskScore = 30;
         if (phq9Score > 15) riskScore += 25;
         else if (phq9Score > 10) riskScore += 15;
@@ -93,55 +111,88 @@ module.exports = async (req, res) => {
         else if (riskScore > 60) riskLevel = 'HIGH';
         else if (riskScore > 40) riskLevel = 'MODERATE';
 
+        const contributingFactors = [];
+        if (phq9Score > 10) contributingFactors.push('Elevated PHQ-9 depression score');
+        if (gad7Score > 10) contributingFactors.push('Elevated GAD-7 anxiety score');
+        if (request.wearable_data?.sleep_hours < 5) contributingFactors.push('Poor sleep duration');
+        if (!contributingFactors.length) contributingFactors.push('No high-risk indicators detected');
+
+        const recommendations = [];
+        if (riskLevel === 'CRITICAL') {
+          recommendations.push({
+            resource_type: 'crisis_line',
+            name: '988 Suicide & Crisis Lifeline',
+            description: '24/7 crisis support - Call or Text 988',
+            contact_info: 'Call or Text: 988',
+            urgency: 'immediate',
+            eligibility_criteria: {}
+          });
+        }
+        if (riskLevel === 'HIGH' || riskLevel === 'CRITICAL') {
+          recommendations.push({
+            resource_type: 'therapy',
+            name: 'Cognitive Behavioral Therapy (CBT)',
+            description: 'Evidence-based therapy for depression and anxiety',
+            contact_info: 'Contact local mental health provider',
+            urgency: 'soon',
+            eligibility_criteria: {}
+          });
+        }
+        if (riskLevel === 'MODERATE' || riskLevel === 'LOW') {
+          recommendations.push({
+            resource_type: 'wellness',
+            name: 'Sleep Hygiene Education',
+            description: 'Improve sleep habits for better mental health',
+            contact_info: 'Contact healthcare provider',
+            urgency: 'routine',
+            eligibility_criteria: {}
+          });
+        }
+
         results.push({
           risk_score: {
             anonymized_id: request.anonymized_id,
             score: riskScore,
             risk_level: riskLevel,
             confidence: 0.75,
-            contributing_factors: ['PHQ-9 score', 'GAD-7 score'],
+            contributing_factors: contributingFactors,
             timestamp: new Date().toISOString()
           },
-          recommendations: [],
+          recommendations: recommendations,
           explanations: {
-            top_features: [],
-            counterfactual: '',
+            top_features: [
+              ['phq9_score', phq9Score * 0.15],
+              ['gad7_score', gad7Score * 0.12]
+            ],
+            counterfactual: riskLevel !== 'LOW'
+              ? `If PHQ-9 were ${Math.max(0, phq9Score - 5)} and GAD-7 were ${Math.max(0, gad7Score - 3)}, risk would decrease.`
+              : 'Current indicators suggest stable mental health.',
             rule_approximation: '',
-            clinical_interpretation: ''
+            clinical_interpretation: `PHQ-9 of ${phq9Score} suggests ${phq9Score < 5 ? 'minimal' : phq9Score < 10 ? 'mild' : phq9Score < 15 ? 'moderate' : phq9Score < 20 ? 'moderately severe' : 'severe'} depression. GAD-7 of ${gad7Score} suggests ${gad7Score < 5 ? 'minimal' : ${gad7Score < 10 ? 'mild' : gad7Score < 15 ? 'moderate' : 'severe'} anxiety.`
           },
           requires_human_review: riskScore > 75,
           alert_triggered: riskScore > 85
         });
+
         successful++;
-      } catch (e) {
+      } catch (error) {
         failed++;
         results.push({
-          risk_score: {
-            anonymized_id: request.anonymized_id || 'unknown',
-            score: 0,
-            risk_level: 'UNKNOWN',
-            confidence: 0,
-            contributing_factors: [],
-            timestamp: new Date().toISOString()
-          },
+          error: error.message || 'Unknown error',
+          risk_score: null,
           recommendations: [],
-          explanations: {
-            top_features: [],
-            counterfactual: `Error: ${e.message}`,
-            rule_approximation: '',
-            clinical_interpretation: ''
-          },
-          requires_human_review: true,
+          explanations: {},
+          requires_human_review: false,
           alert_triggered: false
         });
       }
     }
 
     return res.status(200).json({
-      results,
-      total: requests.length,
-      successful,
-      failed
+      results: results,
+      total: requestBody.requests.length,
+      successful: successful,
+      failed: failed
     });
 
   } catch (error) {

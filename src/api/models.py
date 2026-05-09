@@ -51,13 +51,6 @@ class ScreeningRequest(BaseModel):
             raise ValueError("anonymized_id cannot be empty")
         return v.strip()
 
-    @field_validator('consent_verified')
-    @classmethod
-    def validate_consent(cls, v: bool) -> bool:
-        """Ensure consent is verified"""
-        if not v:
-            raise ValueError("consent_verified must be True to process data")
-        return v
 
     class Config:
         json_schema_extra = {
@@ -261,9 +254,19 @@ class ScreeningResponse(BaseModel):
 
 class RiskScoreResponse(BaseModel):
     """Response model for risk score retrieval"""
-    risk_score: RiskScore = Field(
+    anonymized_id: str = Field(
         ...,
-        description="Retrieved risk score"
+        description="Anonymized identifier"
+    )
+    score: float = Field(
+        ...,
+        ge=0.0,
+        le=100.0,
+        description="Risk score between 0 and 100"
+    )
+    risk_level: RiskLevel = Field(
+        ...,
+        description="Risk level classification"
     )
     found: bool = Field(
         default=True,

@@ -1,0 +1,16 @@
+{
+  "name": "mental-health-risk-assessment",
+  "version": "1.0.0",
+  "description": "Mental Health Risk Assessment System - Vercel Deployment",
+  "main": "index.js",
+  "scripts": {
+    "dev": "vercel dev",
+    "deploy": "vercel"
+  },
+  "dependencies": {
+    "node-fetch": "^2.6.7"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}

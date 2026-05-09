@@ -490,16 +490,12 @@ async def get_risk_score(
                 explanation.factors.get("confidence", 0.0),
             )
 
-        risk_score = RiskScore(
+        return RiskScoreResponse(
             anonymized_id=screening.anonymized_id,
             score=screening.risk_score,
             risk_level=RiskLevel(screening.risk_level),
-            confidence=confidence,
-            contributing_factors=contributing_factors,
-            timestamp=screening.created_at.isoformat(),
+            found=True
         )
-
-        return RiskScoreResponse(risk_score=risk_score, found=True)
 
     except HTTPException:
         raise
