@@ -3,21 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta name="description" content="Mental Health Risk Assessment System - ML-powered screening tool with PHQ-9 and GAD-7 assessments, providing risk scores and clinical recommendations.">
-    <meta name="keywords" content="mental health, risk assessment, PHQ-9, GAD-7, clinical decision support, healthcare">
-    <meta name="author" content="Aakash Raj">
-
-    <!-- Open Graph / Social Media -->
-    <meta property="og:type" content="website">
-    <meta property="og:title" content="Mental Health Risk Assessment System">
-    <meta property="og:description" content="ML-powered mental health screening with PHQ-9, GAD-7 assessments and clinical decision support.">
-    <meta property="og:image" content="/api/og">
-
-    <!-- Twitter Card -->
-    <meta name="twitter:card" content="summary_large_image">
-    <meta name="twitter:title" content="Mental Health Risk Assessment System">
-    <meta name="twitter:description" content="ML-powered mental health screening with PHQ-9, GAD-7 assessments and clinical decision support.">
-
+    <meta name="description" content="Mental Health Risk Assessment System - ML-powered screening tool with PHQ-9 and GAD-7 assessments.">
     <title>Mental Health Risk Assessment System</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -35,13 +21,10 @@
             </div>
             <h1>Mental Health Risk Assessment</h1>
             <p class="subtitle">Evidence-based screening powered by clinical AI</p>
-            <div id="demo-banner" class="demo-banner" style="display: none;">
-                Demo Mode — Using simulated predictions for demonstration
-            </div>
         </header>
 
         <main>
-            <!-- Crisis Resources - Always Visible -->
+            <!-- Crisis Resources -->
             <section id="crisis-section" class="card crisis-banner" aria-label="Crisis Resources">
                 <h2>Immediate Crisis Support</h2>
                 <p>If you or someone you know is in crisis, these resources are available 24/7:</p>
@@ -90,7 +73,7 @@
                 </button>
             </section>
 
-            <!-- Authentication Section -->
+            <!-- Authentication -->
             <section id="auth-section" class="card" aria-label="Authentication">
                 <h2>Authentication</h2>
                 <div id="login-form">
@@ -105,7 +88,7 @@
                         </div>
                     </div>
                     <button onclick="loginUser()" class="btn btn-primary">Sign In</button>
-                    <p class="info-text" style="margin-top:8px;">Default accounts: <strong>admin</strong> / admin &nbsp;|&nbsp; <strong>reviewer</strong> / reviewer</p>
+                    <p class="info-text" style="margin-top:8px;">Default: <strong>admin</strong> / admin &nbsp;|&nbsp; <strong>reviewer</strong> / reviewer</p>
                 </div>
                 <div id="user-info" style="display:none;">
                     <p>Signed in as <strong id="user-display-name"></strong> <span id="user-role-badge" class="risk-badge low" style="font-size:0.75rem;"></span></p>
@@ -121,7 +104,6 @@
                     <label for="anonymized-id">Anonymized Patient ID</label>
                     <input type="text" id="anonymized-id" placeholder="e.g., patient_12345" required>
                 </div>
-
                 <div class="form-group">
                     <label style="display: flex; align-items: center; cursor: pointer;">
                         <input type="checkbox" id="consent-verified" required>
@@ -130,24 +112,21 @@
                 </div>
 
                 <div class="data-sections">
-                    <!-- Survey Data -->
                     <div class="data-section">
                         <h3>Survey Assessments</h3>
                         <div class="form-row">
                             <div class="form-group">
                                 <label for="phq9-score">PHQ-9 Score</label>
                                 <input type="number" id="phq9-score" min="0" max="27" placeholder="0-27">
-                                <p class="info-text">Depression screening questionnaire</p>
+                                <p class="info-text">Depression screening</p>
                             </div>
                             <div class="form-group">
                                 <label for="gad7-score">GAD-7 Score</label>
                                 <input type="number" id="gad7-score" min="0" max="21" placeholder="0-21">
-                                <p class="info-text">Anxiety screening questionnaire</p>
+                                <p class="info-text">Anxiety screening</p>
                             </div>
                         </div>
                     </div>
-
-                    <!-- Wearable Data -->
                     <div class="data-section">
                         <h3>Wearable Data</h3>
                         <div class="form-row">
@@ -161,8 +140,6 @@
                             </div>
                         </div>
                     </div>
-
-                    <!-- EMR Data -->
                     <div class="data-section">
                         <h3>Electronic Medical Record</h3>
                         <div class="form-group">
@@ -177,55 +154,39 @@
                 </div>
 
                 <div class="button-row">
-                    <button onclick="submitScreening()" class="btn btn-primary btn-large">
-                        Run Risk Assessment
-                    </button>
-                    <button onclick="loadSampleScreeningData()" class="btn btn-secondary">
-                        Load Sample Data
-                    </button>
+                    <button onclick="submitScreening()" class="btn btn-primary btn-large">Run Risk Assessment</button>
+                    <button onclick="loadSampleScreeningData()" class="btn btn-secondary">Load Sample Data</button>
                 </div>
             </section>
 
             <!-- Batch Screening -->
             <section id="batch-section" class="card" aria-label="Batch Screening">
                 <h2>Batch Screening</h2>
-                <p class="info-text" style="margin-bottom: 16px;">Submit multiple screening requests at once (maximum 100 per batch)</p>
-
+                <p class="info-text" style="margin-bottom: 16px;">Submit multiple screenings at once (max 100)</p>
                 <div class="form-group">
                     <label for="batch-data">Batch Data (JSON array)</label>
                     <textarea id="batch-data" rows="6" placeholder='[{"anonymized_id": "patient_001", "consent_verified": true, "survey_data": {"phq9_score": 15, "gad7_score": 12}}]'></textarea>
-                    <button onclick="loadSampleBatchData()" class="btn btn-secondary" style="margin-top: 10px;">
-                        Load Sample Data
-                    </button>
+                    <button onclick="loadSampleBatchData()" class="btn btn-secondary" style="margin-top: 10px;">Load Sample Data</button>
                 </div>
-
                 <button onclick="submitBatchScreening()" class="btn btn-primary">Run Batch Assessment</button>
-
                 <div id="batch-results" class="batch-results" style="display: none;"></div>
             </section>
 
             <!-- Clinical Review Queue -->
             <section id="review-section" class="card" aria-label="Clinical Review Queue">
                 <h2>Clinical Review Queue</h2>
-                <p class="info-text" style="margin-bottom:16px;">Cases flagged for clinical review. Requires <strong>admin</strong> or <strong>reviewer</strong> role.</p>
-
+                <p class="info-text" style="margin-bottom:16px;">Cases flagged for review. Requires <strong>admin</strong> or <strong>reviewer</strong> role.</p>
                 <div class="review-controls">
                     <select id="review-status-filter" onchange="loadReviewQueue()">
                         <option value="pending">Pending</option>
                         <option value="reviewed">Reviewed</option>
                         <option value="closed">Closed</option>
                     </select>
-                    <button onclick="loadReviewQueue()" class="btn btn-secondary">
-                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M23 4v6h-6M1 20v-6h6M3.51 9a9 9 0 0114.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0020.49 15"/></svg>
-                        Refresh
-                    </button>
+                    <button onclick="loadReviewQueue()" class="btn btn-secondary">Refresh</button>
                 </div>
-
                 <div id="review-queue-list" class="review-queue-list">
                     <p class="info-text">Click "Refresh" to load the queue.</p>
                 </div>
-
-                <!-- Review detail panel (shown when a review is selected) -->
                 <div id="review-detail" class="review-detail" style="display:none;">
                     <h3>Review: <span id="review-detail-id"></span></h3>
                     <div class="review-meta">
@@ -234,9 +195,7 @@
                         <span><strong>Score:</strong> <span id="review-detail-score"></span></span>
                         <span><strong>Status:</strong> <span id="review-detail-status" class="risk-badge low"></span></span>
                     </div>
-
                     <div id="review-detail-comments" class="review-comments-display"></div>
-
                     <div class="form-group" style="margin-top:16px;">
                         <label for="review-assign-input">Assign Reviewer</label>
                         <div style="display:flex;gap:8px;">
@@ -244,10 +203,9 @@
                             <button onclick="assignReview()" class="btn btn-primary">Assign</button>
                         </div>
                     </div>
-
                     <div class="form-group">
                         <label for="review-comment-input">Add Comment</label>
-                        <textarea id="review-comment-input" rows="3" placeholder="Clinical notes…"></textarea>
+                        <textarea id="review-comment-input" rows="3" placeholder="Clinical notes..."></textarea>
                         <div style="display:flex;gap:8px;margin-top:8px;">
                             <button onclick="commentReview()" class="btn btn-secondary">Save Comment</button>
                             <button onclick="closeReview()" class="btn btn-primary" style="background:linear-gradient(135deg,var(--success) 0%,var(--accent-dark) 100%);">Close Review</button>
@@ -256,10 +214,9 @@
                 </div>
             </section>
 
+            <!-- Results -->
             <section id="results-section" class="card" style="display: none;" aria-label="Assessment Results">
                 <h2>Assessment Results</h2>
-
-                <!-- Risk Score -->
                 <div id="risk-score-display" class="risk-display">
                     <div class="risk-header">
                         <h3>Risk Level</h3>
@@ -269,50 +226,36 @@
                         <span id="score-value">--</span>
                         <span class="score-label">/100</span>
                     </div>
-                    <div class="confidence">
-                        Confidence: <span id="confidence-value">--</span>%
-                    </div>
+                    <div class="confidence">Confidence: <span id="confidence-value">--</span>%</div>
                 </div>
-
-                <!-- Alerts -->
                 <div id="alerts-display" role="alert"></div>
-
-                <!-- Contributing Factors -->
                 <div id="factors-display" class="factors-section">
                     <h3>Contributing Factors</h3>
                     <ul id="factors-list"></ul>
                 </div>
-
-                <!-- Recommendations -->
                 <div id="recommendations-display" class="recommendations-section">
                     <h3>Recommended Resources</h3>
                     <div id="recommendations-list"></div>
                 </div>
-
-                <!-- Explanations -->
                 <div id="explanations-display" class="explanations-section">
                     <h3>Model Explanation</h3>
                     <div id="explanations-content"></div>
                 </div>
             </section>
 
-            <!-- Loading Indicator -->
             <div id="loading" class="loading" style="display: none;" role="status" aria-live="polite">
                 <div class="spinner"></div>
                 <p>Processing assessment...</p>
             </div>
-
-            <!-- Error Display -->
             <div id="error-display" role="alert" style="display: none;"></div>
         </main>
 
         <footer>
             <p><strong>Mental Health Risk Assessment System</strong> v1.0.0</p>
-            <p class="disclaimer">This tool is for clinical decision support only. Always consult with healthcare professionals for medical decisions.</p>
-            <p class="tech-stack">Built with FastAPI, LightGBM, and SHAP &mdash; <a href="https://github.com/aakashraj" target="_blank" rel="noopener">View Source</a></p>
+            <p class="disclaimer">This tool is for clinical decision support only. Always consult with healthcare professionals.</p>
+            <p class="tech-stack">Built with FastAPI, Python, and clinical rules engine</p>
         </footer>
     </div>
-
     <script src="app.js"></script>
 </body>
 </html>
