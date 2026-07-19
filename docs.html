@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>API Documentation — MHRAS</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="styles.css">
+    <link rel="stylesheet" href="legal.css">
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🧠</text></svg>">
+    <style>
+        .docs-frame {
+            width: 100%;
+            height: calc(100vh - 200px);
+            min-height: 600px;
+            border: 1px solid var(--border-light);
+            border-radius: var(--radius-md);
+            background: #fff;
+        }
+        .docs-links {
+            display: flex;
+            gap: 16px;
+            margin-bottom: 20px;
+            flex-wrap: wrap;
+        }
+        .docs-links a {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            padding: 8px 16px;
+            background: var(--surface);
+            border: 1px solid var(--border-light);
+            border-radius: var(--radius-sm);
+            color: var(--primary);
+            text-decoration: none;
+            font-size: 0.9rem;
+            font-weight: 500;
+            transition: all var(--transition-fast);
+        }
+        .docs-links a:hover {
+            border-color: var(--accent);
+            color: var(--accent);
+            background: #f0fdfa;
+        }
+        .docs-links a.active {
+            background: var(--primary);
+            color: #fff;
+            border-color: var(--primary);
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="legal-page">
+            <a href="/" class="back-link">&larr; Back to MHRAS</a>
+
+            <div class="legal-header">
+                <h1>API Documentation</h1>
+                <p class="last-updated">Interactive API reference for the MHRAS backend</p>
+            </div>
+
+            <div class="docs-links">
+                <a href="/api/docs" class="active" target="_blank">Swagger UI</a>
+                <a href="/api/redoc" target="_blank">ReDoc</a>
+                <a href="/api/openapi.json" target="_blank">OpenAPI JSON</a>
+            </div>
+
+            <iframe src="/api/docs" class="docs-frame" title="Swagger UI"></iframe>
+
+            <footer>
+                <p><a href="/">MHRAS</a> &middot; <a href="/docs">API Docs</a> &middot; <a href="/terms.html">Terms</a> &middot; <a href="/privacy.html">Privacy</a> &middot; <a href="/hipaa.html">HIPAA</a> &middot; <a href="/disclaimer.html">Disclaimer</a></p>
+                <p>&copy; 2026 MHRAS. All rights reserved.</p>
+            </footer>
+        </div>
+    </div>
+</body>
+</html>
