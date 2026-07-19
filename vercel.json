@@ -12,6 +12,9 @@
     { "src": "disclaimer.html", "use": "@vercel/static" }
   ],
   "routes": [
+    { "src": "/docs", "dest": "/api/docs" },
+    { "src": "/redoc", "dest": "/api/redoc" },
+    { "src": "/openapi.json", "dest": "/api/openapi.json" },
     { "src": "/api(?:/(.*))?", "dest": "api/index.py" },
     { "src": "/app.js", "dest": "/app.js" },
     { "src": "/styles.css", "dest": "/styles.css" },
