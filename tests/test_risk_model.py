@@ -1,11 +1,11 @@
 """Tests for the clinical rules risk model."""
 
-from src.risk_model import ClinicalRulesModel, get_risk_model
+from src.risk_model import ClinicalRulesModel, OllamaRiskModel, RiskModel, get_risk_model
 
 
 def test_get_risk_model_returns_instance():
     model = get_risk_model()
-    assert isinstance(model, ClinicalRulesModel)
+    assert isinstance(model, RiskModel)
 
 
 def test_low_risk_scores_low():

@@ -14,7 +14,8 @@ Architecture
     │  score()  →  classify()  →  explain()              │
     └──────────────┬────────────────┬────────────────────┘
                    │                │
-       ClinicalRulesModel     (future) LightGBMModel
+       ClinicalRulesModel     OllamaRiskModel
+       (scoring + classify)    (AI-generated explanations)
 
 Public API consumed by endpoints:
 
@@ -34,11 +35,14 @@ Public API consumed by endpoints:
 
 from __future__ import annotations
 
+import json
 import logging
 import math
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 from typing import Any, Dict, List, Optional, Tuple
+
+import httpx
 
 from src.config import settings
 
@@ -373,6 +377,178 @@ class ClinicalRulesModel(RiskModel):
 
 
 # ---------------------------------------------------------------------------
+# Ollama-backed explanation model
+# ---------------------------------------------------------------------------
+
+class OllamaRiskModel(RiskModel):
+    """Hybrid model: ClinicalRulesModel for scoring, Ollama for explanations.
+
+    Uses the clinical rules engine for deterministic, calibrated scoring
+    and classification, then sends the structured data + assessment to an
+    Ollama API to generate natural-language clinical interpretations,
+    contributing factors, and counterfactual scenarios.
+
+    Falls back to the rules-engine explanations if Ollama is unreachable
+    or returns invalid output.
+    """
+
+    _SYSTEM_PROMPT = (
+        "You are a clinical decision-support assistant for a mental health "
+        "risk assessment system. You generate concise, evidence-based "
+        "clinical interpretations. You do NOT diagnose conditions. You "
+        "provide decision-support text for licensed clinicians to review. "
+        "All outputs must include a disclaimer that they are decision-support "
+        "only and not a diagnosis. Respond ONLY with valid JSON."
+    )
+
+    _USER_PROMPT_TEMPLATE = (
+        "Given this patient screening data and risk assessment, generate:\n"
+        "1. \"factors\" — a list of the top 3-5 contributing clinical factors "
+        "(short phrases, NOT full sentences)\n"
+        "2. \"interpretation\" — a 2-3 sentence clinical interpretation "
+        "suitable for a clinician's review. Must include a disclaimer.\n"
+        "3. \"counterfactual\" — a 1-2 sentence description of what could "
+        "reduce this patient's risk level. Must note it is illustrative.\n\n"
+        "Patient data:\n{data}\n\n"
+        "Risk score: {score:.1f}%\n"
+        "Risk level: {level}\n"
+        "Probability: {probability:.1%}\n\n"
+        "Respond with JSON only: "
+        '{{"factors": [...], "interpretation": "...", "counterfactual": "..."}}'
+    )
+
+    def __init__(self) -> None:
+        self._rules = ClinicalRulesModel()
+        self._base_url = settings.ml.ollama_base_url.rstrip("/")
+        self._model = settings.ml.ollama_model
+        self._api_key = settings.ml.ollama_api_key
+        self._timeout = settings.ml.ollama_timeout
+
+    # ── score / classify — delegated to rules engine ─────────────────────
+
+    def score(self, data: Dict[str, Any]) -> float:
+        return self._rules.score(data)
+
+    def classify(self, probability: float) -> Tuple[str, float, bool, bool]:
+        return self._rules.classify(probability)
+
+    # ── explain — Ollama-backed ──────────────────────────────────────────
+
+    def explain(
+        self,
+        data: Dict[str, Any],
+        probability: float,
+        risk_level: str,
+    ) -> Tuple[List[str], List[Tuple[str, float]], str, str]:
+
+        # Get rule-based features first (always available, used as fallback
+        # and to provide top_features list regardless of LLM output)
+        rule_factors, rule_features, rule_clinical, rule_counter = (
+            self._rules.explain(data, probability, risk_level)
+        )
+
+        # Call Ollama for enhanced explanations
+        try:
+            llm_result = self._call_ollama(data, probability, risk_level)
+            if llm_result:
+                factors = llm_result.get("factors", rule_factors)
+                if not factors:
+                    factors = rule_factors
+                clinical = llm_result.get("interpretation", rule_clinical)
+                if not clinical:
+                    clinical = rule_clinical
+                counterfactual = llm_result.get("counterfactual", rule_counter)
+                if not counterfactual:
+                    counterfactual = rule_counter
+
+                logger.info("Ollama explanation generated successfully")
+                return factors, rule_features, clinical, counterfactual
+
+        except Exception as e:
+            logger.warning("Ollama explanation failed, using rules fallback: %s", e)
+
+        return rule_factors, rule_features, rule_clinical, rule_counter
+
+    # ── Ollama API call ──────────────────────────────────────────────────
+
+    def _call_ollama(
+        self,
+        data: Dict[str, Any],
+        probability: float,
+        risk_level: str,
+    ) -> Optional[Dict[str, Any]]:
+        """Call Ollama API to generate clinical explanations."""
+        prompt = self._USER_PROMPT_TEMPLATE.format(
+            data=json.dumps(data, indent=2, default=str),
+            score=probability * 100,
+            level=risk_level,
+            probability=probability,
+        )
+
+        headers = {"Content-Type": "application/json"}
+        if self._api_key:
+            headers["Authorization"] = f"Bearer {self._api_key}"
+
+        payload = {
+            "model": self._model,
+            "prompt": prompt,
+            "system": self._SYSTEM_PROMPT,
+            "format": "json",
+            "stream": False,
+            "options": {
+                "temperature": 0.3,
+                "num_predict": 512,
+            },
+        }
+
+        resp = httpx.post(
+            f"{self._base_url}/api/generate",
+            headers=headers,
+            json=payload,
+            timeout=self._timeout,
+        )
+        resp.raise_for_status()
+
+        response_text = resp.json().get("response", "")
+        if not response_text:
+            logger.warning("Ollama returned empty response")
+            return None
+
+        return self._parse_llm_json(response_text)
+
+    @staticmethod
+    def _parse_llm_json(text: str) -> Optional[Dict[str, Any]]:
+        """Robustly extract JSON from LLM response text."""
+        # Try direct parse
+        try:
+            return json.loads(text)
+        except json.JSONDecodeError:
+            pass
+
+        # Try to find JSON block in markdown code fence
+        for marker in ("```json", "```"):
+            if marker in text:
+                start = text.index(marker) + len(marker)
+                end = text.index("```", start) if "```" in text[start:] else len(text)
+                try:
+                    return json.loads(text[start:end].strip())
+                except (json.JSONDecodeError, ValueError):
+                    continue
+
+        # Try to find first { ... } block
+        brace_start = text.find("{")
+        brace_end = text.rfind("}")
+        if brace_start != -1 and brace_end > brace_start:
+            try:
+                return json.loads(text[brace_start:brace_end + 1])
+            except json.JSONDecodeError:
+                pass
+
+        logger.warning("Could not parse LLM JSON response")
+        return None
+
+
+# ---------------------------------------------------------------------------
 # Singleton accessor
 # ---------------------------------------------------------------------------
 
@@ -382,13 +558,19 @@ _instance: Optional[RiskModel] = None
 def get_risk_model() -> RiskModel:
     """Return the application-wide risk-model instance.
 
-    Replace the body of this function to swap in a trained ML model:
-
-    >>> def get_risk_model() -> RiskModel:
-    ...     return LightGBMModel.from_registry(model_id="prod_v3")
+    Uses OllamaRiskModel for AI-generated clinical explanations with
+    ClinicalRulesModel for deterministic scoring and classification.
+    Falls back to ClinicalRulesModel only if Ollama is not configured.
     """
     global _instance
     if _instance is None:
-        _instance = ClinicalRulesModel()
-        logger.info("ClinicalRulesModel initialised (swap for ML later)")
+        if settings.ml.ollama_api_key or settings.ml.ollama_base_url != "http://localhost:11434":
+            _instance = OllamaRiskModel()
+            logger.info(
+                "OllamaRiskModel initialised (model=%s, url=%s)",
+                settings.ml.ollama_model, settings.ml.ollama_base_url,
+            )
+        else:
+            _instance = ClinicalRulesModel()
+            logger.info("ClinicalRulesModel initialised (Ollama not configured)")
     return _instance

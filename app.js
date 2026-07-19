@@ -2,56 +2,141 @@ const API_BASE_URL = window.location.hostname === 'localhost'
   ? 'http://localhost:8000'
   : '/api';
 
-function getHeaders() {
-    return { 'Content-Type': 'application/json' };
+// ── Firebase Auth ──────────────────────────────────────────────────────────
+
+const auth = firebase.auth();
+const googleProvider = new firebase.auth.GoogleAuthProvider();
+googleProvider.setCustomParameters({ prompt: 'select_account' });
+
+let _fbUser = null;
+
+// ── Token management ───────────────────────────────────────────────────────
+
+async function getIdToken() {
+    if (!_fbUser) return null;
+    try {
+        // getIdToken() returns a cached token if valid, refreshes if needed
+        return await _fbUser.getIdToken();
+    } catch (_) { return null; }
 }
 
-// ── Auth ──────────────────────────────────────────────────────────────────
+async function authHeaders() {
+    const token = await getIdToken();
+    const h = { 'Content-Type': 'application/json' };
+    if (token) h['Authorization'] = `Bearer ${token}`;
+    return h;
+}
 
-async function loginUser() {
-    const username = document.getElementById('login-username').value.trim();
+// ── Auth UI ────────────────────────────────────────────────────────────────
+
+async function googleSignIn() {
+    try {
+        await auth.signInWithPopup(googleProvider);
+        // onAuthStateChanged handles the rest
+    } catch (e) {
+        if (e.code !== 'auth/popup-closed-by-user') {
+            showError(`Google sign-in failed: ${e.message}`);
+        }
+    }
+}
+
+async function firebaseLogin() {
+    const email = document.getElementById('login-email').value.trim();
     const password = document.getElementById('login-password').value.trim();
-    if (!username || !password) { showError('Please enter username and password'); return; }
+    if (!email || !password) { showError('Please enter email and password'); return; }
 
     try {
-        const res = await fetch(`${API_BASE_URL}/auth/login`, {
-            method: 'POST', headers: getHeaders(), credentials: 'include',
-            body: JSON.stringify({ username, password }),
-        });
-        if (!res.ok) { const err = await res.json(); throw new Error(err.detail || 'Login failed'); }
-        const data = await res.json();
-        showAuthState(data.user_id, data.role, data.display_name);
-        showSuccess(`Signed in as ${data.display_name}`);
-        checkSystemStatus();
-    } catch (e) { showError(`Login failed: ${e.message}`); }
+        await auth.signInWithEmailAndPassword(email, password);
+    } catch (e) {
+        showError(`Login failed: ${e.message}`);
+    }
 }
 
-async function logoutUser() {
-    try { await fetch(`${API_BASE_URL}/auth/logout`, { method: 'POST', credentials: 'include' }); } catch (_) {}
+async function firebaseRegister() {
+    const email = document.getElementById('login-email').value.trim();
+    const password = document.getElementById('login-password').value.trim();
+    if (!email || !password) { showError('Please enter email and password'); return; }
+    if (password.length < 6) { showError('Password must be at least 6 characters'); return; }
+
+    try {
+        const cred = await auth.createUserWithEmailAndPassword(email, password);
+        // Set display name to the part before @
+        await cred.user.updateProfile({ displayName: email.split('@')[0] });
+        showSuccess('Account created! You are now signed in.');
+    } catch (e) {
+        showError(`Registration failed: ${e.message}`);
+    }
+}
+
+async function firebaseLogout() {
+    try {
+        await auth.signOut();
+    } catch (_) {}
+    _fbUser = null;
     document.getElementById('login-form').style.display = '';
     document.getElementById('user-info').style.display = 'none';
+    document.getElementById('user-avatar').style.display = 'none';
     showSuccess('Signed out');
 }
 
-async function checkSession() {
-    try {
-        const res = await fetch(`${API_BASE_URL}/auth/me`, { credentials: 'include' });
-        if (res.ok) { const u = await res.json(); showAuthState(u.user_id, u.role, u.display_name); }
-    } catch (_) {}
-}
-
-function showAuthState(userId, role, displayName) {
+function showAuthState(user) {
     document.getElementById('login-form').style.display = 'none';
     document.getElementById('user-info').style.display = '';
-    document.getElementById('user-display-name').textContent = displayName || userId;
-    const badge = document.getElementById('user-role-badge');
-    badge.textContent = role;
-    badge.className = `risk-badge ${role === 'admin' ? 'moderate' : 'low'}`;
+
+    // Show avatar if available (Google users have photoURL)
+    const avatar = document.getElementById('user-avatar');
+    if (user.photoURL) {
+        avatar.src = user.photoURL;
+        avatar.alt = user.displayName || user.email || '';
+        avatar.style.display = '';
+    } else {
+        avatar.style.display = 'none';
+    }
+
+    // Fetch role from backend
+    fetchMe();
+}
+
+async function fetchMe() {
+    try {
+        const r = await fetch(`${API_BASE_URL}/auth/me`, { headers: await authHeaders() });
+        if (r.ok) {
+            const u = await r.json();
+            const badge = document.getElementById('user-role-badge');
+            badge.textContent = u.role;
+            badge.className = `risk-badge ${u.role === 'admin' ? 'moderate' : 'low'}`;
+            document.getElementById('user-display-name').textContent = u.display_name || u.email || u.uid;
+
+            // Update avatar if backend has a photo_url
+            if (u.photo_url) {
+                const avatar = document.getElementById('user-avatar');
+                avatar.src = u.photo_url;
+                avatar.style.display = '';
+            }
+        }
+    } catch (_) {}
 }
 
 // ── Init ──────────────────────────────────────────────────────────────────
 
-window.addEventListener('DOMContentLoaded', () => { checkSession(); checkSystemStatus(); });
+window.addEventListener('DOMContentLoaded', () => {
+    checkSystemStatus();
+
+    auth.onAuthStateChanged(async (user) => {
+        if (user) {
+            _fbUser = user;
+            // Refresh token on auth state change to keep it fresh
+            try { await user.getIdToken(true); } catch (_) {}
+            showAuthState(user);
+            checkSystemStatus();
+        } else {
+            _fbUser = null;
+            document.getElementById('login-form').style.display = '';
+            document.getElementById('user-info').style.display = 'none';
+            document.getElementById('user-avatar').style.display = 'none';
+        }
+    });
+});
 
 // ── Status ────────────────────────────────────────────────────────────────
 
@@ -62,13 +147,13 @@ async function checkSystemStatus() {
     updateStatusElement('queue-status', 'checking', 'Checking...');
 
     try {
-        const r = await fetch(`${API_BASE_URL}/health`, { credentials: 'include', headers: getHeaders() });
+        const r = await fetch(`${API_BASE_URL}/health`);
         if (r.ok) { updateStatusElement('api-status', 'healthy', 'Healthy'); }
         else { updateStatusElement('api-status', 'error', 'Error'); }
     } catch (_) { updateStatusElement('api-status', 'error', 'Offline'); }
 
     try {
-        const r = await fetch(`${API_BASE_URL}/statistics`, { credentials: 'include', headers: getHeaders() });
+        const r = await fetch(`${API_BASE_URL}/statistics`, { headers: await authHeaders() });
         if (r.ok) {
             const s = await r.json();
             const sc = s.screenings || {};
@@ -124,7 +209,7 @@ async function submitScreening() {
 
     showLoading(true); hideError(); hideResults();
     try {
-        const r = await fetch(`${API_BASE_URL}/screen`, { method: 'POST', credentials: 'include', headers: getHeaders(), body: JSON.stringify(payload) });
+        const r = await fetch(`${API_BASE_URL}/screen`, { method: 'POST', headers: await authHeaders(), body: JSON.stringify(payload) });
         if (!r.ok) { const e = await r.json(); throw new Error(e.detail || `HTTP ${r.status}`); }
         displayResults(await r.json());
     } catch (e) { showError(`Assessment failed: ${e.message}`); }
@@ -143,7 +228,7 @@ async function submitBatchScreening() {
 
     showLoading(true); hideError();
     try {
-        const r = await fetch(`${API_BASE_URL}/batch-screen`, { method: 'POST', credentials: 'include', headers: getHeaders(), body: JSON.stringify({ requests }) });
+        const r = await fetch(`${API_BASE_URL}/batch-screen`, { method: 'POST', headers: await authHeaders(), body: JSON.stringify({ requests }) });
         if (!r.ok) { const e = await r.json(); throw new Error(e.detail || `HTTP ${r.status}`); }
         displayBatchResults(await r.json());
     } catch (e) { showError(`Batch failed: ${e.message}`); }
@@ -250,7 +335,7 @@ async function loadReviewQueue() {
     const list = document.getElementById('review-queue-list');
     list.innerHTML = '<p class="info-text">Loading...</p>';
     try {
-        const r = await fetch(`${API_BASE_URL}/reviews/queue?status_filter=${filter}&limit=50`, { credentials: 'include', headers: getHeaders() });
+        const r = await fetch(`${API_BASE_URL}/reviews?status=${filter}&limit=50`, { headers: await authHeaders() });
         if (r.status === 401 || r.status === 403) { list.innerHTML = '<p class="info-text">Sign in as <strong>admin</strong> or <strong>reviewer</strong>.</p>'; return; }
         if (!r.ok) throw new Error(`HTTP ${r.status}`);
         const data = await r.json();
@@ -260,7 +345,7 @@ async function loadReviewQueue() {
         data.reviews.forEach(r => {
             const cls = (r.risk_level || 'low').toLowerCase();
             const sel = r.id === _selectedReviewId ? ' review-item--selected' : '';
-            html += `<div class="review-item${sel}" onclick="selectReview('${r.id}', this)" data-review='${JSON.stringify(r).replace(/'/g, "&#39;")}'><div class="review-item-header"><strong>${r.anonymized_id || '?'}</strong><span class="risk-badge ${cls}">${r.risk_level || '-'}</span><span>Score: ${r.risk_score != null ? r.risk_score.toFixed(1) : '-'}</span><span class="review-item-status">${r.status}</span></div><div class="review-item-meta">${r.reviewer || 'Unassigned'} · ${new Date(r.created_at).toLocaleString()}</div></div>`;
+            html += `<div class="review-item${sel}" onclick="selectReview('${r.id}', this)" data-review='${JSON.stringify(r).replace(/'/g, "&#39;")}'><div class="review-item-header"><strong>${r.anonymized_id || '?'}</strong><span class="risk-badge ${cls}">${r.risk_level || '-'}</span><span>Score: ${r.risk_score != null ? r.risk_score.toFixed(1) : '-'}</span><span class="review-item-status">${r.status}</span></div><div class="review-item-meta">${r.reviewer_uid || 'Unassigned'} · ${r.created_at ? new Date(r.created_at).toLocaleString() : ''}</div></div>`;
         });
         list.innerHTML = html;
     } catch (e) { list.innerHTML = `<p class="error-message">Failed: ${e.message}</p>`; }
@@ -276,10 +361,10 @@ function selectReview(id, el) {
     document.getElementById('review-detail-score').textContent = data.risk_score != null ? data.risk_score.toFixed(1) : '-';
     const badge = document.getElementById('review-detail-status');
     badge.textContent = data.status;
-    badge.className = `risk-badge ${data.status === 'closed' ? 'low' : data.status === 'reviewed' ? 'moderate' : 'high'}`;
+    badge.className = `risk-badge ${data.status === 'closed' ? 'low' : data.status === 'approved' ? 'moderate' : 'high'}`;
     const commentsEl = document.getElementById('review-detail-comments');
-    commentsEl.innerHTML = data.comments ? `<h4>Comments</h4><pre>${data.comments}</pre>` : '<p class="info-text">No comments yet.</p>';
-    document.getElementById('review-assign-input').value = data.reviewer || '';
+    commentsEl.innerHTML = data.notes ? `<h4>Notes</h4><pre>${data.notes}</pre>` : '<p class="info-text">No notes yet.</p>';
+    document.getElementById('review-assign-input').value = data.reviewer_uid || '';
     document.getElementById('review-comment-input').value = '';
     document.querySelectorAll('.review-item').forEach(i => i.classList.remove('review-item--selected'));
     el.classList.add('review-item--selected');
@@ -288,9 +373,9 @@ function selectReview(id, el) {
 async function assignReview() {
     if (!_selectedReviewId) return;
     const reviewer = document.getElementById('review-assign-input').value.trim();
-    if (!reviewer) { showError('Enter a reviewer username'); return; }
+    if (!reviewer) { showError('Enter a reviewer UID or email'); return; }
     try {
-        const r = await fetch(`${API_BASE_URL}/reviews/${_selectedReviewId}/assign`, { method: 'POST', credentials: 'include', headers: getHeaders(), body: JSON.stringify({ reviewer }) });
+        const r = await fetch(`${API_BASE_URL}/reviews/${_selectedReviewId}/assign`, { method: 'POST', headers: await authHeaders(), body: JSON.stringify({ reviewer }) });
         if (!r.ok) { const e = await r.json(); throw new Error(e.detail || r.status); }
         showSuccess(`Assigned to ${reviewer}`); loadReviewQueue();
     } catch (e) { showError(`Assign failed: ${e.message}`); }
@@ -299,11 +384,11 @@ async function assignReview() {
 async function commentReview() {
     if (!_selectedReviewId) return;
     const comments = document.getElementById('review-comment-input').value.trim();
-    if (!comments) { showError('Enter a comment'); return; }
+    if (!comments) { showError('Enter a note'); return; }
     try {
-        const r = await fetch(`${API_BASE_URL}/reviews/${_selectedReviewId}/comment`, { method: 'POST', credentials: 'include', headers: getHeaders(), body: JSON.stringify({ comments }) });
+        const r = await fetch(`${API_BASE_URL}/reviews/${_selectedReviewId}/comment`, { method: 'POST', headers: await authHeaders(), body: JSON.stringify({ comments }) });
         if (!r.ok) { const e = await r.json(); throw new Error(e.detail || r.status); }
-        showSuccess('Comment saved'); loadReviewQueue();
+        showSuccess('Note saved'); loadReviewQueue();
     } catch (e) { showError(`Comment failed: ${e.message}`); }
 }
 
@@ -312,7 +397,7 @@ async function closeReview() {
     const comments = document.getElementById('review-comment-input').value.trim();
     try {
         const body = comments ? { comments } : undefined;
-        const r = await fetch(`${API_BASE_URL}/reviews/${_selectedReviewId}/close`, { method: 'POST', credentials: 'include', headers: getHeaders(), body: body ? JSON.stringify(body) : undefined });
+        const r = await fetch(`${API_BASE_URL}/reviews/${_selectedReviewId}/close`, { method: 'POST', headers: await authHeaders(), body: body ? JSON.stringify(body) : undefined });
         if (!r.ok) { const e = await r.json(); throw new Error(e.detail || r.status); }
         showSuccess('Review closed'); _selectedReviewId = null;
         document.getElementById('review-detail').style.display = 'none'; loadReviewQueue();

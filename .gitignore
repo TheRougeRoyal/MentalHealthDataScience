@@ -47,6 +47,9 @@ ENV/
 env.bak/
 venv.bak/
 
+# Node (orphaned modules — this is a Python project)
+node_modules/
+
 # IDEs
 .vscode/
 .idea/
@@ -68,6 +71,11 @@ dmypy.json
 
 # Pyre type checker
 .pyre/
+
+# Firebase service account (NEVER commit)
+service-account.json
+*adminsdk*.json
+*-firebase-adminsdk-*.json
 
 # Project specific
 *.log
@@ -96,3 +104,4 @@ dmypy.json
 # OS files
 .DS_Store
 Thumbs.db
+.vercel

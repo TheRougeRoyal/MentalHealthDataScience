@@ -1,33 +1,52 @@
-"""MHRAS API application — clean minimal setup."""
+"""MHRAS API application — Firebase/Firestore backend."""
 
 import logging
+import os
 from fastapi import FastAPI, Request, status
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
+from slowapi import Limiter, _rate_limit_exceeded_handler
+from slowapi.util import get_remote_address
+from slowapi.errors import RateLimitExceeded
 
 from src.api.models import ErrorResponse
+from src.api.metrics import PrometheusMiddleware, metrics_response
 from src.logging_config import setup_logging
-from src.database import init_db, check_health, engine
 
 setup_logging()
 logger = logging.getLogger(__name__)
 
+limiter = Limiter(key_func=get_remote_address, default_limits=["120/minute"])
+
 app = FastAPI(
     title="Mental Health Risk Assessment System API",
-    version="1.0.0",
+    version="2.0.0",
     docs_url="/docs",
     redoc_url="/redoc",
     openapi_url="/openapi.json",
 )
+app.state.limiter = limiter
+app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
+
+ALLOWED_ORIGINS = [
+    origin.strip()
+    for origin in os.environ.get(
+        "CORS_ORIGINS",
+        "https://mental-health-data-science.vercel.app,http://localhost:3000",
+    ).split(",")
+    if origin.strip()
+]
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=ALLOWED_ORIGINS,
     allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_methods=["GET", "POST", "PATCH", "DELETE", "OPTIONS"],
+    allow_headers=["Authorization", "Content-Type"],
 )
+
+app.add_middleware(PrometheusMiddleware)
 
 
 @app.exception_handler(RequestValidationError)
@@ -73,34 +92,34 @@ app.include_router(reviews_router)
 
 @app.on_event("startup")
 async def startup_event():
-    logger.info("Starting MHRAS API...")
-    init_db()
-    if not check_health():
-        logger.error("Database health-check failed during startup")
-    else:
-        logger.info("Database health-check passed")
+    logger.info("Starting MHRAS API (Firebase backend)...")
     logger.info("API docs at /docs")
 
 
 @app.on_event("shutdown")
 async def shutdown_event():
     logger.info("Shutting down MHRAS API...")
-    engine.dispose()
-    logger.info("MHRAS API shutdown complete")
+
+
+# ── Prometheus metrics ─────────────────────────────────────────────────────
+
+@app.get("/metrics", tags=["Monitoring"], include_in_schema=False)
+async def prometheus_metrics():
+    return metrics_response()
 
 
 # ── Health / root ──────────────────────────────────────────────────────────
 
 @app.get("/health", tags=["Health"])
-async def health_check():
-    return {"status": "healthy", "service": "MHRAS API", "version": "1.0.0"}
+async def health_check(request: Request):
+    return {"status": "healthy", "service": "MHRAS API", "version": "2.0.0"}
 
 
 @app.get("/", tags=["Root"])
 async def root():
     return {
         "service": "Mental Health Risk Assessment System API",
-        "version": "1.0.0",
+        "version": "2.0.0",
         "status": "operational",
         "docs": "/docs",
     }

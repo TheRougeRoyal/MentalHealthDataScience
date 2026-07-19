@@ -1,7 +1,8 @@
 """Configuration management using Pydantic settings"""
 
+import os
 from typing import List, Optional
-from pydantic import Field
+from pydantic import Field, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -42,13 +43,17 @@ class APIConfig(BaseSettings):
 
 class MLConfig(BaseSettings):
     """Machine learning configuration"""
-    
+
     model_storage_path: str = Field(default="models/", description="Path to model storage")
     inference_timeout: int = Field(default=2, description="Inference timeout in seconds")
     ensemble_weights: Optional[str] = Field(default=None, description="JSON string of ensemble weights")
     risk_threshold_high: float = Field(default=51.0, description="High risk threshold")
     risk_threshold_critical: float = Field(default=75.0, description="Critical risk threshold")
-    
+    ollama_base_url: str = Field(default="http://localhost:11434", description="Ollama API base URL")
+    ollama_model: str = Field(default="llama3", description="Ollama model name")
+    ollama_api_key: str = Field(default="", description="Ollama API key (for cloud-hosted instances)")
+    ollama_timeout: int = Field(default=30, description="Ollama request timeout in seconds")
+
     model_config = SettingsConfigDict(
         env_prefix="ML_",
         env_file=".env",
@@ -74,18 +79,28 @@ class LoggingConfig(BaseSettings):
 
 class SecurityConfig(BaseSettings):
     """Security configuration"""
-    
-    jwt_secret: str = Field(default="change-me-in-production", description="JWT secret key")
+
+    jwt_secret: str = Field(default="", description="JWT secret key (required)")
     jwt_algorithm: str = Field(default="HS256", description="JWT algorithm")
     jwt_expiry_hours: int = Field(default=24, description="JWT expiry in hours")
-    anonymization_salt: str = Field(default="change-me-in-production", description="Salt for anonymization")
-    
+    anonymization_salt: str = Field(default="", description="Salt for anonymization (required)")
+
     model_config = SettingsConfigDict(
         env_prefix="SECURITY_",
         env_file=".env",
         env_file_encoding="utf-8",
         extra="ignore"
     )
+
+    @model_validator(mode="after")
+    def _resolve_secrets(self) -> "SecurityConfig":
+        self.jwt_secret = self.jwt_secret or os.environ.get("SECURITY_JWT_SECRET", "")
+        self.anonymization_salt = self.anonymization_salt or os.environ.get("SECURITY_ANONYMIZATION_SALT", "")
+        if not self.jwt_secret:
+            raise ValueError("SECURITY_JWT_SECRET is required but not set")
+        if not self.anonymization_salt:
+            raise ValueError("SECURITY_ANONYMIZATION_SALT is required but not set")
+        return self
 
 
 class GovernanceConfig(BaseSettings):
