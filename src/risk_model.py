@@ -108,10 +108,33 @@ class RiskModel(ABC):
             input_data, probability, risk_level,
         )
 
-        # Confidence is derived from how far the probability is from the
-        # decision boundary (0.5).  Scores near the boundary → low
-        # confidence; extreme scores → high confidence.
-        confidence = min(1.0, 0.5 + abs(probability - 0.5))
+        # ── Confidence calibration ───────────────────────────────────────
+        # Combines three signals:
+        #   1. Boundary distance — scores near 0.5 are inherently uncertain
+        #   2. Data completeness — more features → higher confidence
+        #   3. Feature availability — critical features boost confidence
+
+        boundary_confidence = min(1.0, 0.5 + abs(probability - 0.5))
+
+        features_present = sum(
+            1 for key in _FEATURE_WEIGHTS if input_data.get(key) is not None
+        )
+        completeness_confidence = features_present / len(_FEATURE_WEIGHTS)
+
+        # Critical features (PHQ-9, GAD-7) carry extra weight for confidence
+        critical_features = {"phq9_score", "gad7_score"}
+        critical_present = sum(
+            1 for f in critical_features if input_data.get(f) is not None
+        )
+        critical_confidence = 0.7 + 0.3 * (critical_present / len(critical_features))
+
+        # Weighted combination
+        confidence = (
+            0.40 * boundary_confidence
+            + 0.35 * completeness_confidence
+            + 0.25 * critical_confidence
+        )
+        confidence = max(0.1, min(1.0, confidence))
 
         return AssessmentResult(
             probability=round(probability, 4),
@@ -150,13 +173,13 @@ _FEATURE_WEIGHTS: Dict[str, Dict[str, Any]] = {
     },
     "sleep_hours": {
         "weight": 0.18,
-        "max_value": None,     # inversely scored
+        "max_value": None,
         "label": "Sleep Duration",
         "clinical": "Nightly sleep hours (deviation from optimal 7–9 h)",
     },
     "avg_heart_rate": {
         "weight": 0.12,
-        "max_value": None,     # deviation scoring
+        "max_value": None,
         "label": "Resting Heart Rate",
         "clinical": "Average resting heart rate (elevated may indicate stress)",
     },
@@ -164,15 +187,51 @@ _FEATURE_WEIGHTS: Dict[str, Dict[str, Any]] = {
         "weight": 0.10,
         "max_value": None,
         "label": "Psychiatric Diagnosis Codes",
-        "clinical": "Presence of ICD-10 psychiatric diagnoses",
+        "clinical": "Presence and severity of ICD-10 psychiatric diagnoses",
     },
     "medications": {
         "weight": 0.08,
         "max_value": None,
         "label": "Psychotropic Medications",
-        "clinical": "Number of psychotropic medications currently prescribed",
+        "clinical": "Number and class of psychotropic medications currently prescribed",
     },
 }
+
+# ── Feature interaction terms ─────────────────────────────────────────────
+# These capture clinically meaningful compounding effects between features.
+# Each interaction has a weight (added to the raw sum after normalisation)
+# and a minimum contribution threshold — both features must exceed it.
+
+_INTERACTION_TERMS: List[Dict[str, Any]] = [
+    {
+        "name": "depression_sleep_compound",
+        "label": "Depression + Sleep Disturbance Compound",
+        "features": ["phq9_score", "sleep_hours"],
+        "thresholds": [0.4, 0.15],   # PHQ-9 normalised > 0.4 AND sleep deviation > 0.15
+        "multiplier": 0.12,
+    },
+    {
+        "name": "anxiety_hr_compound",
+        "label": "Anxiety + Elevated Heart Rate Compound",
+        "features": ["gad7_score", "avg_heart_rate"],
+        "thresholds": [0.4, 0.15],
+        "multiplier": 0.18,
+    },
+    {
+        "name": "diagnosis_medication_compound",
+        "label": "Multiple Diagnoses + Medication Burden",
+        "features": ["diagnosis_codes", "medications"],
+        "thresholds": [0.3, 0.25],
+        "multiplier": 0.08,
+    },
+    {
+        "name": "depression_anxiety_compound",
+        "label": "Comorbid Depression + Anxiety",
+        "features": ["phq9_score", "gad7_score"],
+        "thresholds": [0.5, 0.5],
+        "multiplier": 0.15,
+    },
+]
 
 
 class ClinicalRulesModel(RiskModel):
@@ -188,22 +247,47 @@ class ClinicalRulesModel(RiskModel):
     def score(self, data: Dict[str, Any]) -> float:
         raw_sum = 0.0
         total_weight = 0.0
+        contributions: Dict[str, float] = {}
 
         for feat_key, meta in _FEATURE_WEIGHTS.items():
             contribution = self._feature_contribution(feat_key, data)
             if contribution is not None:
-                raw_sum += meta["weight"] * contribution
+                weighted = meta["weight"] * contribution
+                raw_sum += weighted
                 total_weight += meta["weight"]
+                contributions[feat_key] = contribution
+
+        # ── Feature interactions ──────────────────────────────────────────
+        interaction_bonus = 0.0
+        triggered_interactions: List[str] = []
+        for interaction in _INTERACTION_TERMS:
+            feature_names = interaction["features"]
+            thresholds = interaction["thresholds"]
+            if all(f in contributions for f in feature_names):
+                if all(
+                    contributions[f] >= t
+                    for f, t in zip(feature_names, thresholds)
+                ):
+                    interaction_bonus += interaction["multiplier"]
+                    triggered_interactions.append(interaction["label"])
 
         if total_weight == 0:
             return 0.5  # no information → neutral
 
         # Normalise to the weight that was actually used.
-        normalised = raw_sum / total_weight
+        normalised = (raw_sum + interaction_bonus) / (total_weight + interaction_bonus)
 
-        # Push through a sigmoid centred on 0.5 for calibration.
-        # logit maps [0,1] → [-∞, +∞]; sigmoid maps back.
-        logit = (normalised - 0.5) * 6.0  # steepness factor
+        # ── Dynamic sigmoid ──────────────────────────────────────────────
+        # Steepness adapts to data completeness: more features → steeper
+        # (more decisive); fewer features → flatter (more uncertain).
+        features_available = len(contributions)
+        total_features = len(_FEATURE_WEIGHTS)
+        completeness = features_available / total_features
+
+        # Steepness ranges from 3.0 (minimal data) to 8.0 (full data)
+        steepness = 3.0 + completeness * 5.0
+
+        logit = (normalised - 0.5) * steepness
         probability = 1.0 / (1.0 + math.exp(-logit))
 
         return max(0.0, min(1.0, probability))
@@ -268,58 +352,151 @@ class ClinicalRulesModel(RiskModel):
     def _feature_contribution(
         key: str, data: Dict[str, Any],
     ) -> Optional[float]:
-        """Normalise a single feature value to [0, 1]."""
+        """Normalise a single feature value to [0, 1] using clinical zones."""
 
         if key == "phq9_score":
             v = data.get("phq9_score")
             if v is None:
                 return None
-            return max(0.0, min(1.0, v / 27.0))
+            # PHQ-9 clinical severity bands:
+            #   0-4 minimal, 5-9 mild, 10-14 moderate, 15-19 mod-severe, 20-27 severe
+            # Non-linear mapping gives higher weight to severe range.
+            if v <= 4:
+                return v / 4.0 * 0.15          # 0 → 0.15
+            if v <= 9:
+                return 0.15 + (v - 4) / 5.0 * 0.20   # 0.15 → 0.35
+            if v <= 14:
+                return 0.35 + (v - 9) / 5.0 * 0.25    # 0.35 → 0.60
+            if v <= 19:
+                return 0.60 + (v - 14) / 5.0 * 0.20   # 0.60 → 0.80
+            return 0.80 + (v - 19) / 8.0 * 0.20        # 0.80 → 1.00
 
         if key == "gad7_score":
             v = data.get("gad7_score")
             if v is None:
                 return None
-            return max(0.0, min(1.0, v / 21.0))
+            # GAD-7 clinical severity bands:
+            #   0-4 minimal, 5-9 mild, 10-14 moderate, 15-21 severe
+            if v <= 4:
+                return v / 4.0 * 0.15
+            if v <= 9:
+                return 0.15 + (v - 4) / 5.0 * 0.25    # 0.15 → 0.40
+            if v <= 14:
+                return 0.40 + (v - 9) / 5.0 * 0.30    # 0.40 → 0.70
+            return 0.70 + (v - 14) / 7.0 * 0.30        # 0.70 → 1.00
 
         if key == "sleep_hours":
             v = data.get("sleep_hours")
             if v is None:
                 return None
-            # Optimal is 7–9 h; farther away → higher risk.
-            if 7.0 <= v <= 9.0:
+            # Clinical sleep zones:
+            #   <4 severe insomnia → high risk
+            #   4-6 moderate insomnia → moderate risk
+            #   6-7 mild deviation → low risk
+            #   7-9 optimal → 0
+            #   9-11 mild hypersomnia → low-moderate risk
+            #   >11 severe hypersomnia → high risk
+            if v < 4.0:
+                return 0.85 + min(0.15, (4.0 - v) / 4.0 * 0.15)
+            if v < 6.0:
+                return 0.40 + (6.0 - v) / 2.0 * 0.45   # 0.40 → 0.85
+            if v < 7.0:
+                return 0.10 + (7.0 - v) / 1.0 * 0.30   # 0.10 → 0.40
+            if v <= 9.0:
                 return 0.0
-            deviation = min(abs(v - 7.0), abs(v - 9.0))
-            return max(0.0, min(1.0, deviation / 5.0))
+            if v <= 11.0:
+                return (v - 9.0) / 2.0 * 0.35           # 0 → 0.35
+            return 0.35 + min(0.50, (v - 11.0) / 3.0 * 0.50)  # 0.35 → 0.85
 
         if key == "avg_heart_rate":
             v = data.get("avg_heart_rate")
             if v is None:
                 return None
-            # Normal resting HR 60–80.  Elevated → higher risk.
-            if 60 <= v <= 80:
+            # Clinical heart rate zones (resting, adults):
+            #   <50 bradycardia → moderate risk
+            #   50-60 low-normal → minimal
+            #   60-80 normal → 0
+            #   80-100 elevated → moderate risk
+            #   100-120 tachycardia → high risk
+            #   >120 severe tachycardia → very high risk
+            if v < 50:
+                return 0.30 + min(0.40, (50 - v) / 20.0 * 0.40)
+            if v < 60:
+                return (60 - v) / 10.0 * 0.30           # 0 → 0.30
+            if v <= 80:
                 return 0.0
-            deviation = max(0, v - 80) if v > 80 else max(0, 60 - v)
-            return max(0.0, min(1.0, deviation / 40.0))
+            if v <= 100:
+                return (v - 80) / 20.0 * 0.40           # 0 → 0.40
+            if v <= 120:
+                return 0.40 + (v - 100) / 20.0 * 0.35   # 0.40 → 0.75
+            return 0.75 + min(0.25, (v - 120) / 30.0 * 0.25)  # 0.75 → 1.00
 
         if key == "diagnosis_codes":
             v = data.get("diagnosis_codes")
             if not v:
                 return None
             codes = v if isinstance(v, list) else [v]
-            psych_prefixes = ("F3", "F4", "F2", "F1")
-            psych_count = sum(
-                1 for c in codes
-                if any(c.upper().startswith(p) for p in psych_prefixes)
-            )
-            return max(0.0, min(1.0, psych_count / 3.0))
+            # Weight diagnoses by clinical severity using ICD-10 groups:
+            #   F2x schizophrenia spectrum → 1.0 per code (highest severity)
+            #   F3x mood disorders → 0.8 per code
+            #   F4x anxiety/PTSD → 0.7 per code
+            #   F1x substance use → 0.6 per code
+            #   Other psych → 0.3 per code
+            severity_map = {
+                "F2": 1.0,
+                "F3": 0.8,
+                "F4": 0.7,
+                "F1": 0.6,
+            }
+            total_severity = 0.0
+            for c in codes:
+                upper = c.upper().strip()
+                matched = False
+                for prefix, sev in severity_map.items():
+                    if upper.startswith(prefix):
+                        total_severity += sev
+                        matched = True
+                        break
+                if not matched:
+                    total_severity += 0.3
+            # 1 high-severity diagnosis → 0.80; 3+ → 1.0
+            return max(0.0, min(1.0, total_severity / 3.5))
 
         if key == "medications":
             v = data.get("medications")
             if not v:
                 return None
             meds = v if isinstance(v, list) else [v]
-            return max(0.0, min(1.0, len(meds) / 4.0))
+            # Weight by psychotropic class severity:
+            #   Antipsychotics (risperidone, olanzapine, quetiapine, haloperidol) → 1.0
+            #   Mood stabilizers (lithium, valproate, lamotrigine) → 0.85
+            #   Anxiolytics (lorazepam, alprazolam, diazepam) → 0.7
+            #   Antidepressants (sertraline, fluoxetine, etc.) → 0.5
+            #   Other → 0.3
+            antipsychotics = {"risperidone", "olanzapine", "quetiapine", "haloperidol",
+                              "aripiprazole", "clozapine", "ziprasidone", "paliperidone"}
+            mood_stabilizers = {"lithium", "valproate", "valproic acid", "lamotrigine",
+                                "carbamazepine", "oxcarbazepine"}
+            anxiolytics = {"lorazepam", "alprazolam", "diazepam", "clonazepam",
+                           "temazepam", "midazolam"}
+            antidepressants = {"sertraline", "fluoxetine", "escitalopram", "citalopram",
+                               "paroxetine", "venlafaxine", "duloxetine", "amitriptyline",
+                               "mirtazapine", "bupropion", "trazodone", "nefazodone"}
+            total_severity = 0.0
+            for med in meds:
+                lower = med.lower().strip()
+                if lower in antipsychotics:
+                    total_severity += 1.0
+                elif lower in mood_stabilizers:
+                    total_severity += 0.85
+                elif lower in anxiolytics:
+                    total_severity += 0.7
+                elif lower in antidepressants:
+                    total_severity += 0.5
+                else:
+                    total_severity += 0.3
+            # 1 antidepressant → 0.50; 1 antipsychotic → 0.80; 3+ mixed → 1.0
+            return max(0.0, min(1.0, total_severity / 3.0))
 
         return None
 
