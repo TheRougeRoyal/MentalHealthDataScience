@@ -181,6 +181,269 @@ header h1 {
     font-weight: 600;
 }
 
+/* ── Tier 1: Gauge + Force Plot + Simulator ───────────────────────────── */
+
+.risk-visualization {
+    display: grid;
+    grid-template-columns: 220px 1fr;
+    gap: 24px;
+    align-items: center;
+    margin: 8px 0 16px;
+    position: relative;
+    z-index: 1;
+}
+
+.gauge-wrap {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 6px;
+}
+
+.gauge-svg {
+    width: 200px;
+    height: 120px;
+    overflow: visible;
+}
+
+.gauge-arc-bg { stroke: rgba(255,255,255,0.15); }
+.gauge-arc-fg {
+    stroke-linecap: round;
+    transition: stroke-dasharray 0.9s cubic-bezier(0.4, 0, 0.2, 1), stroke 0.3s;
+}
+.gauge-needle {
+    transform-origin: 100px 100px;
+    transition: transform 0.9s cubic-bezier(0.4, 0, 0.2, 1);
+}
+.gauge-label {
+    fill: rgba(255,255,255,0.85);
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+}
+
+.force-plot-wrap {
+    background: rgba(255,255,255,0.08);
+    border-radius: var(--radius-md);
+    padding: 14px 16px;
+    backdrop-filter: blur(4px);
+}
+
+.force-plot-wrap h4 {
+    color: rgba(255,255,255,0.9);
+    font-size: 0.8rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    margin-bottom: 10px;
+}
+
+.force-row {
+    display: grid;
+    grid-template-columns: 130px 1fr 50px;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 8px;
+    font-size: 0.85rem;
+}
+
+.force-row .fname { color: rgba(255,255,255,0.85); font-weight: 500; }
+.force-bar-track {
+    position: relative;
+    height: 18px;
+    background: rgba(255,255,255,0.1);
+    border-radius: 9px;
+    overflow: hidden;
+}
+.force-bar-zero {
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    width: 1px;
+    background: rgba(255,255,255,0.4);
+}
+.force-bar-fill {
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    border-radius: 9px;
+    transition: left 0.8s cubic-bezier(0.4, 0, 0.2, 1), width 0.8s cubic-bezier(0.4, 0, 0.2, 1), background 0.3s;
+}
+.force-row .fval { color: rgba(255,255,255,0.7); font-variant-numeric: tabular-nums; text-align: right; }
+
+/* What-if simulator */
+.simulator-section {
+    margin-top: 24px;
+    background: linear-gradient(135deg, var(--bg-secondary) 0%, #fff 100%);
+    border: 1px solid var(--border-light);
+    border-radius: var(--radius-md);
+    padding: 20px;
+}
+
+.simulator-section h3 {
+    color: var(--primary);
+    margin-bottom: 4px;
+}
+
+.simulator-section .info-text { margin-bottom: 16px; }
+
+.slider-row {
+    display: grid;
+    grid-template-columns: 140px 1fr 60px;
+    align-items: center;
+    gap: 14px;
+    margin-bottom: 14px;
+}
+
+.slider-row label {
+    font-size: 0.9rem;
+    font-weight: 500;
+    color: var(--text-secondary);
+}
+
+.slider-row input[type=range] {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 100%;
+    height: 6px;
+    background: var(--border-light);
+    border-radius: 3px;
+    outline: none;
+}
+
+.slider-row input[type=range]::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 18px;
+    height: 18px;
+    border-radius: 50%;
+    background: var(--accent);
+    cursor: pointer;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.15);
+    transition: transform var(--transition-fast);
+}
+.slider-row input[type=range]::-webkit-slider-thumb:hover { transform: scale(1.15); }
+.slider-row input[type=range]::-moz-range-thumb {
+    width: 18px; height: 18px; border-radius: 50%;
+    background: var(--accent); cursor: pointer; border: none;
+}
+
+.slider-value {
+    font-variant-numeric: tabular-nums;
+    font-weight: 600;
+    color: var(--primary);
+    text-align: right;
+    font-size: 0.95rem;
+}
+
+.sim-result {
+    margin-top: 16px;
+    padding: 14px 18px;
+    border-radius: var(--radius-md);
+    background: var(--surface);
+    border: 1px solid var(--border-light);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 12px;
+}
+
+.sim-score {
+    font-size: 1.8rem;
+    font-weight: 800;
+    color: var(--primary);
+    line-height: 1;
+}
+.sim-score small { font-size: 0.9rem; font-weight: 500; opacity: 0.6; }
+.sim-delta {
+    font-size: 0.9rem;
+    font-weight: 600;
+    padding: 4px 10px;
+    border-radius: 12px;
+}
+.sim-delta.down { background: #c6f6d9; color: #22543d; }
+.sim-delta.up { background: #fed7d7; color: #742a2a; }
+.sim-delta.same { background: var(--bg-tertiary); color: var(--text-muted); }
+
+.sim-badge {
+    padding: 6px 14px;
+    border-radius: 20px;
+    font-weight: 600;
+    font-size: 0.85rem;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+}
+
+/* Trend sparkline */
+.trend-section {
+    margin-top: 24px;
+    background: var(--bg-secondary);
+    padding: 18px 20px;
+    border-radius: var(--radius-md);
+    border: 1px solid var(--border-light);
+}
+
+.trend-section h3 {
+    color: var(--primary);
+    font-size: 1.1rem;
+    margin-bottom: 4px;
+}
+
+.trend-meta {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-bottom: 10px;
+}
+
+.trend-count { font-size: 0.85rem; color: var(--text-muted); }
+.trend-arrow {
+    font-size: 0.9rem;
+    font-weight: 600;
+    padding: 3px 10px;
+    border-radius: 10px;
+}
+.trend-arrow.down { background: #c6f6d9; color: #22543d; }
+.trend-arrow.up { background: #fed7d7; color: #742a2a; }
+.trend-arrow.flat { background: var(--bg-tertiary); color: var(--text-muted); }
+
+.trend-svg {
+    width: 100%;
+    height: 80px;
+    display: block;
+}
+
+.trend-line { fill: none; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+.trend-area { opacity: 0.18; }
+.trend-dot { stroke: white; stroke-width: 2; }
+.trend-band-low { fill: rgba(56,161,105,0.06); }
+.trend-band-mod { fill: rgba(237,137,54,0.06); }
+.trend-band-high { fill: rgba(229,62,62,0.08); }
+
+.trend-empty {
+    color: var(--text-muted);
+    font-size: 0.9rem;
+    padding: 20px;
+    text-align: center;
+}
+
+@media (max-width: 768px) {
+    .risk-visualization { grid-template-columns: 1fr; }
+    .gauge-wrap { margin-bottom: 8px; }
+    .slider-row { grid-template-columns: 100px 1fr 50px; }
+}
+
+@media print {
+    .simulator-section,
+    .risk-visualization {
+        display: none;
+    }
+}
+
 /* Crisis Section - More impactful */
 .crisis-banner {
     background: linear-gradient(135deg, #c53030 0%, #9b2c2c 100%);

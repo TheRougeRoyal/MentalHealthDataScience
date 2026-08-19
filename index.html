@@ -304,6 +304,10 @@
                         <h3>Risk Level</h3>
                         <span id="risk-badge" class="risk-badge"></span>
                     </div>
+                    <div class="risk-visualization">
+                        <div class="gauge-wrap"><div id="risk-gauge"></div></div>
+                        <div id="force-plot" class="force-plot-wrap"></div>
+                    </div>
                     <div class="risk-score-value">
                         <span id="score-value">--</span>
                         <span class="score-label">/100</span>
@@ -311,6 +315,44 @@
                     <div class="confidence">Confidence: <span id="confidence-value">--</span>%</div>
                 </div>
                 <div id="alerts-display" role="alert"></div>
+
+                <div id="simulator-section" class="simulator-section">
+                    <h3>What-If Simulator</h3>
+                    <p class="info-text">Drag the sliders to see how each input changes risk in real time. The model runs locally in your browser.</p>
+                    <div class="slider-row">
+                        <label for="sim-phq9">PHQ-9 (depression)</label>
+                        <input type="range" id="sim-phq9" min="0" max="27" step="1" value="10">
+                        <span class="slider-value" id="sim-phq9-val">10</span>
+                    </div>
+                    <div class="slider-row">
+                        <label for="sim-gad7">GAD-7 (anxiety)</label>
+                        <input type="range" id="sim-gad7" min="0" max="21" step="1" value="8">
+                        <span class="slider-value" id="sim-gad7-val">8</span>
+                    </div>
+                    <div class="slider-row">
+                        <label for="sim-sleep">Sleep (hours)</label>
+                        <input type="range" id="sim-sleep" min="0" max="14" step="0.5" value="7.5">
+                        <span class="slider-value" id="sim-sleep-val">7.5</span>
+                    </div>
+                    <div class="slider-row">
+                        <label for="sim-hr">Resting HR (bpm)</label>
+                        <input type="range" id="sim-hr" min="40" max="140" step="1" value="72">
+                        <span class="slider-value" id="sim-hr-val">72</span>
+                    </div>
+                    <div class="sim-result">
+                        <div>
+                            <div class="sim-score"><span id="sim-score">--</span><small>/100</small></div>
+                            <div class="sim-delta same" id="sim-delta">baseline</div>
+                        </div>
+                        <span class="sim-badge" id="sim-badge" style="background:#718096;color:white;">--</span>
+                    </div>
+                </div>
+
+                <div id="trend-section" class="trend-section">
+                    <h3>Risk Trajectory</h3>
+                    <div id="trend-container"></div>
+                </div>
+
                 <div id="factors-display" class="factors-section">
                     <h3>Contributing Factors</h3>
                     <ul id="factors-list"></ul>

@@ -121,6 +121,7 @@ async function fetchMe() {
 
 window.addEventListener('DOMContentLoaded', () => {
     checkSystemStatus();
+    initSimulator();
 
     auth.onAuthStateChanged(async (user) => {
         if (user) {
@@ -264,6 +265,40 @@ function displayResults(data) {
     badge.textContent = rs.risk_level;
     badge.className = `risk-badge ${rs.risk_level}`;
 
+    // Tier 1: gauge + force plot
+    const contribs = {};
+    (data.explanations?.top_features || []).forEach(([label, val]) => {
+        // map back to key for clientScore parity
+        const key = Object.entries(FEATURE_WEIGHTS).find(([, m]) => m.label === label)?.[0];
+        if (key) contribs[key] = val;
+    });
+    if (Object.keys(contribs).length) {
+        renderForcePlot(document.getElementById('force-plot'), contribs);
+    } else {
+        document.getElementById('force-plot').innerHTML = '';
+    }
+    renderGauge(document.getElementById('risk-gauge'), rs.score, rs.risk_level);
+
+    // Record for trend + seed simulator baseline
+    recordLocalScreening(rs.anonymized_id, rs.score, rs.risk_level, rs.timestamp);
+    renderTrend(document.getElementById('trend-container'), rs.anonymized_id);
+
+    // Reconstruct input data for simulator from the form fields
+    const simInput = {};
+    const phq9 = document.getElementById('phq9-score').value;
+    const gad7 = document.getElementById('gad7-score').value;
+    const sleep = document.getElementById('sleep-hours').value;
+    const hr = document.getElementById('avg-heart-rate').value;
+    const dx = document.getElementById('diagnosis-codes').value.trim();
+    const meds = document.getElementById('medications').value.trim();
+    if (phq9) simInput.phq9_score = parseInt(phq9);
+    if (gad7) simInput.gad7_score = parseInt(gad7);
+    if (sleep) simInput.sleep_hours = parseFloat(sleep);
+    if (hr) simInput.avg_heart_rate = parseInt(hr);
+    if (dx) simInput.diagnosis_codes = dx.split(',').map(c => c.trim());
+    if (meds) simInput.medications = meds.split(',').map(m => m.trim());
+    if (Object.keys(simInput).length) setSimulatorBaseline(simInput, rs.score);
+
     const alerts = document.getElementById('alerts-display');
     alerts.innerHTML = '';
     if (data.alert_triggered) alerts.innerHTML = '<div class="alert-box danger"><span>⚠️</span><strong>Alert:</strong> Immediate attention recommended</div>';
@@ -404,9 +439,267 @@ async function closeReview() {
     } catch (e) { showError(`Close failed: ${e.message}`); }
 }
 
-// ── Utilities ─────────────────────────────────────────────────────────────
+// ── Client-side rules mirror (for live what-if simulator) ─────────────────
+// ponytail: mirrors src/risk_model.py ClinicalRulesModel; client-only so the
+// simulator runs in <16ms per slider tick. Drift risk if backend thresholds
+// change — bump when clinical team updates weights.
 
-function showLoading(show) { document.getElementById('loading').style.display = show ? 'block' : 'none'; }
+const FEATURE_WEIGHTS = {
+    phq9_score: { weight: 0.30, label: 'PHQ-9' },
+    gad7_score: { weight: 0.22, label: 'GAD-7' },
+    sleep_hours: { weight: 0.18, label: 'Sleep' },
+    avg_heart_rate: { weight: 0.12, label: 'Heart Rate' },
+    diagnosis_codes: { weight: 0.10, label: 'Diagnoses' },
+    medications: { weight: 0.08, label: 'Medications' },
+};
+
+function _phq9(v) {
+    if (v <= 4) return v / 4 * 0.15;
+    if (v <= 9) return 0.15 + (v - 4) / 5 * 0.20;
+    if (v <= 14) return 0.35 + (v - 9) / 5 * 0.25;
+    if (v <= 19) return 0.60 + (v - 14) / 5 * 0.20;
+    return Math.min(1.0, 0.80 + (v - 19) / 8 * 0.20);
+}
+function _gad7(v) {
+    if (v <= 4) return v / 4 * 0.15;
+    if (v <= 9) return 0.15 + (v - 4) / 5 * 0.25;
+    if (v <= 14) return 0.40 + (v - 9) / 5 * 0.30;
+    return Math.min(1.0, 0.70 + (v - 14) / 7 * 0.30);
+}
+function _sleep(v) {
+    if (v < 4) return Math.min(1.0, 0.85 + (4 - v) / 4 * 0.15);
+    if (v < 6) return 0.40 + (6 - v) / 2 * 0.45;
+    if (v < 7) return 0.10 + (7 - v) * 0.30;
+    if (v <= 9) return 0.0;
+    if (v <= 11) return (v - 9) / 2 * 0.35;
+    return Math.min(0.85, 0.35 + (v - 11) / 3 * 0.50);
+}
+function _hr(v) {
+    if (v < 50) return Math.min(0.70, 0.30 + (50 - v) / 20 * 0.40);
+    if (v < 60) return (60 - v) / 10 * 0.30;
+    if (v <= 80) return 0.0;
+    if (v <= 100) return (v - 80) / 20 * 0.40;
+    if (v <= 120) return 0.40 + (v - 100) / 20 * 0.35;
+    return Math.min(1.0, 0.75 + (v - 120) / 30 * 0.25);
+}
+function _dx(codes) {
+    if (!codes || !codes.length) return null;
+    const sev = { F2: 1.0, F3: 0.8, F4: 0.7, F1: 0.6 };
+    let t = 0;
+    for (const c of codes) {
+        const u = c.toUpperCase().trim();
+        let hit = false;
+        for (const [p, s] of Object.entries(sev)) {
+            if (u.startsWith(p)) { t += s; hit = true; break; }
+        }
+        if (!hit) t += 0.3;
+    }
+    return Math.max(0, Math.min(1, t / 3.5));
+}
+function _meds(meds) {
+    if (!meds || !meds.length) return null;
+    const a = { antipsychotic: ['risperidone','olanzapine','quetiapine','haloperidol','aripiprazole','clozapine','ziprasidone','paliperidone'], mood: ['lithium','valproate','valproic acid','lamotrigine','carbamazepine','oxcarbazepine'], benzo: ['lorazepam','alprazolam','diazepam','clonazepam','temazepam','midazolam'], ssri: ['sertraline','fluoxetine','escitalopram','citalopram','paroxetine','venlafaxine','duloxetine','amitriptyline','mirtazapine','bupropion','trazodone','nefazodone'] };
+    let t = 0;
+    for (const m of meds) {
+        const l = m.toLowerCase().trim();
+        if (a.antipsychotic.includes(l)) t += 1.0;
+        else if (a.mood.includes(l)) t += 0.85;
+        else if (a.benzo.includes(l)) t += 0.7;
+        else if (a.ssri.includes(l)) t += 0.5;
+        else t += 0.3;
+    }
+    return Math.max(0, Math.min(1, t / 3.0));
+}
+
+function clientScore(d) {
+    const contribs = {};
+    let raw = 0, w = 0;
+    if (d.phq9_score != null) { const c = _phq9(d.phq9_score); contribs.phq9_score = c; raw += 0.30 * c; w += 0.30; }
+    if (d.gad7_score != null) { const c = _gad7(d.gad7_score); contribs.gad7_score = c; raw += 0.22 * c; w += 0.22; }
+    if (d.sleep_hours != null) { const c = _sleep(d.sleep_hours); contribs.sleep_hours = c; raw += 0.18 * c; w += 0.18; }
+    if (d.avg_heart_rate != null) { const c = _hr(d.avg_heart_rate); contribs.avg_heart_rate = c; raw += 0.12 * c; w += 0.12; }
+    if (d.diagnosis_codes) { const c = _dx(d.diagnosis_codes); if (c != null) { contribs.diagnosis_codes = c; raw += 0.10 * c; w += 0.10; } }
+    if (d.medications) { const c = _meds(d.medications); if (c != null) { contribs.medications = c; raw += 0.08 * c; w += 0.08; } }
+    if (w === 0) return { probability: 0.5, risk_score: 50, risk_level: 'low', contributions: {} };
+    const n = raw / w;
+    const steep = 3.0 + (Object.keys(contribs).length / 6) * 5.0;
+    const prob = 1 / (1 + Math.exp(-(n - 0.5) * steep));
+    const rs = Math.max(0, Math.min(100, prob * 100));
+    let lvl = 'low';
+    if (rs >= 75) lvl = 'critical';
+    else if (rs >= 51) lvl = 'high';
+    else if (rs >= 30) lvl = 'moderate';
+    return { probability: prob, risk_score: rs, risk_level: lvl, contributions: contribs };
+}
+
+function levelColor(level) {
+    return { low: '#38a169', moderate: '#ed8936', high: '#e53e3e', critical: '#9b2c2c' }[level] || '#718096';
+}
+
+// ── Gauge + force plot ────────────────────────────────────────────────────
+
+function renderGauge(container, score, level) {
+    container.innerHTML = `
+        <svg class="gauge-svg" viewBox="0 0 200 120" aria-label="Risk score gauge">
+            <path class="gauge-arc-bg" d="M 20 100 A 80 80 0 0 1 180 100" fill="none" stroke-width="14"/>
+            <path class="gauge-arc-fg" id="gauge-arc-fg" d="M 20 100 A 80 80 0 0 1 180 100" fill="none" stroke-width="14" stroke="${levelColor(level)}" stroke-dasharray="0 251"/>
+            <line class="gauge-needle" id="gauge-needle" x1="100" y1="100" x2="100" y2="30" stroke="white" stroke-width="3" stroke-linecap="round" transform="rotate(-90 100 100)"/>
+            <circle cx="100" cy="100" r="6" fill="white"/>
+            <text class="gauge-label" x="20" y="115" text-anchor="middle">0</text>
+            <text class="gauge-label" x="100" y="20" text-anchor="middle">50</text>
+            <text class="gauge-label" x="180" y="115" text-anchor="middle">100</text>
+        </svg>`;
+    const arcLen = 251; // half-circle path length approximation
+    requestAnimationFrame(() => {
+        const fill = Math.min(arcLen, (score / 100) * arcLen);
+        document.getElementById('gauge-arc-fg').setAttribute('stroke-dasharray', `${fill} ${arcLen}`);
+        const angle = -90 + (score / 100) * 180;
+        document.getElementById('gauge-needle').setAttribute('transform', `rotate(${angle} 100 100)`);
+    });
+}
+
+function renderForcePlot(container, contributions) {
+    // Zero line = baseline score (average across all features, normalised 0.5)
+    // Each bar shows how much THIS feature pushes risk up/down from baseline.
+    const entries = Object.entries(contributions)
+        .map(([k, v]) => [FEATURE_WEIGHTS[k]?.label || k, v, FEATURE_WEIGHTS[k]?.weight || 0.1])
+        .filter(([, v]) => v > 0.01)
+        .sort((a, b) => Math.abs(b[1] * b[2]) - Math.abs(a[1] * a[2]));
+
+    if (!entries.length) {
+        container.innerHTML = '<p style="color:rgba(255,255,255,0.7);font-size:0.85rem;margin:0;">No feature contributions available.</p>';
+        return;
+    }
+
+    // Compute pull (signed contribution) — each feature's contribution × weight,
+    // scaled so the largest pull is visually ~half the row width.
+    const pulls = entries.map(([label, val, w]) => [label, val * w, val]);
+    const maxAbs = Math.max(...pulls.map(([, p]) => Math.abs(p))) || 1;
+    const scale = 45 / maxAbs; // px per unit at max
+
+    container.innerHTML = '<h4>Feature Attribution</h4>' + pulls.map(([label, pull, val]) => {
+        const width = Math.abs(pull) * scale;
+        const left = pull >= 0 ? 50 : Math.max(0, 50 - width);
+        const color = pull >= 0 ? '#fc8181' : '#68d391';
+        return `<div class="force-row">
+            <span class="fname">${label}</span>
+            <div class="force-bar-track"><div class="force-bar-zero" style="left:50%"></div><div class="force-bar-fill" style="left:${left}%;width:${width}%;background:${color}"></div></div>
+            <span class="fval">${(val * 100).toFixed(0)}%</span>
+        </div>`;
+    }).join('');
+}
+
+// ── What-if simulator ─────────────────────────────────────────────────────
+
+let _simBaseline = null;
+
+function initSimulator() {
+    const phq9 = document.getElementById('sim-phq9');
+    const gad7 = document.getElementById('sim-gad7');
+    const sleep = document.getElementById('sim-sleep');
+    const hr = document.getElementById('sim-hr');
+    if (!phq9) return;
+
+    [phq9, gad7, sleep, hr].forEach(el => el.addEventListener('input', updateSimulator));
+}
+
+function setSimulatorBaseline(inputData, actualScore) {
+    _simBaseline = { data: { ...inputData }, score: actualScore };
+    if (inputData.phq9_score != null) document.getElementById('sim-phq9').value = inputData.phq9_score;
+    if (inputData.gad7_score != null) document.getElementById('sim-gad7').value = inputData.gad7_score;
+    if (inputData.sleep_hours != null) document.getElementById('sim-sleep').value = inputData.sleep_hours;
+    if (inputData.avg_heart_rate != null) document.getElementById('sim-hr').value = inputData.avg_heart_rate;
+    updateSimulator();
+}
+
+function updateSimulator() {
+    if (!_simBaseline) return;
+    const tweaked = { ..._simBaseline.data };
+    tweaked.phq9_score = parseInt(document.getElementById('sim-phq9').value);
+    tweaked.gad7_score = parseInt(document.getElementById('sim-gad7').value);
+    tweaked.sleep_hours = parseFloat(document.getElementById('sim-sleep').value);
+    tweaked.avg_heart_rate = parseInt(document.getElementById('sim-hr').value);
+    document.getElementById('sim-phq9-val').textContent = tweaked.phq9_score;
+    document.getElementById('sim-gad7-val').textContent = tweaked.gad7_score;
+    document.getElementById('sim-sleep-val').textContent = tweaked.sleep_hours.toFixed(1);
+    document.getElementById('sim-hr-val').textContent = tweaked.avg_heart_rate;
+
+    const r = clientScore(tweaked);
+    document.getElementById('sim-score').textContent = r.risk_score.toFixed(1);
+    const badge = document.getElementById('sim-badge');
+    badge.textContent = r.risk_level;
+    badge.style.background = levelColor(r.risk_level);
+    badge.style.color = 'white';
+
+    const delta = r.risk_score - _simBaseline.score;
+    const dEl = document.getElementById('sim-delta');
+    if (Math.abs(delta) < 0.5) {
+        dEl.textContent = 'no change';
+        dEl.className = 'sim-delta same';
+    } else if (delta < 0) {
+        dEl.textContent = `▼ ${Math.abs(delta).toFixed(1)} pts lower`;
+        dEl.className = 'sim-delta down';
+    } else {
+        dEl.textContent = `▲ ${delta.toFixed(1)} pts higher`;
+        dEl.className = 'sim-delta up';
+    }
+}
+
+// ── Temporal trend sparkline ──────────────────────────────────────────────
+
+const _historyCache = new Map();
+
+async function loadPatientHistory(anonymizedId) {
+    if (!anonymizedId) return [];
+    if (_historyCache.has(anonymizedId)) return _historyCache.get(anonymizedId);
+    // The /risk-score/{id} endpoint returns the latest. To show a trend, query
+    // screenings collection directly via /statistics? No — Firestore query
+    // isn't exposed. We approximate trend by replaying locally-stored submissions.
+    return _historyCache.get(anonymizedId) || [];
+}
+
+function recordLocalScreening(anonymizedId, score, level, timestamp) {
+    if (!anonymizedId) return;
+    if (!_historyCache.has(anonymizedId)) _historyCache.set(anonymizedId, []);
+    const arr = _historyCache.get(anonymizedId);
+    arr.push({ score, level, timestamp: timestamp || new Date().toISOString() });
+    if (arr.length > 30) arr.shift(); // cap history
+}
+
+function renderTrend(container, anonymizedId) {
+    const history = _historyCache.get(anonymizedId) || [];
+    if (history.length < 2) {
+        container.innerHTML = '<p class="trend-empty">Run the assessment again later to see this patient\'s risk trajectory.</p>';
+        return;
+    }
+    const w = 600, h = 80, pad = 8;
+    const scores = history.map(h => h.score);
+    const min = Math.min(...scores, 0), max = Math.max(...scores, 100);
+    const x = i => pad + (i / (history.length - 1)) * (w - 2 * pad);
+    const y = s => h - pad - ((s - min) / (max - min || 1)) * (h - 2 * pad);
+    const pts = history.map((h, i) => `${x(i)},${y(h.score)}`).join(' ');
+    const area = `M ${x(0)},${h - pad} L ${pts} L ${x(history.length - 1)},${h - pad} Z`;
+    const last = scores[scores.length - 1], prev = scores[scores.length - 2];
+    const dir = last > prev + 0.5 ? 'up' : last < prev - 0.5 ? 'down' : 'flat';
+    const arrow = dir === 'up' ? '▲' : dir === 'down' ? '▼' : '◆';
+    const arrowText = dir === 'up' ? `${arrow} ${(last - prev).toFixed(1)} from last` : dir === 'down' ? `${arrow} ${(prev - last).toFixed(1)} from last` : '◆ stable';
+
+    container.innerHTML = `
+        <div class="trend-meta">
+            <span class="trend-count">${history.length} screenings for ${anonymizedId}</span>
+            <span class="trend-arrow ${dir}">${arrowText}</span>
+        </div>
+        <svg class="trend-svg" viewBox="0 0 ${w} ${h}" preserveAspectRatio="none" aria-label="Risk score trend">
+            <rect class="trend-band-low" x="0" y="${y(30)}" width="${w}" height="${h - pad - y(30)}"/>
+            <rect class="trend-band-mod" x="0" y="${y(51)}" width="${w}" height="${y(30) - y(51)}"/>
+            <rect class="trend-band-high" x="0" y="${y(75)}" width="${w}" height="${y(51) - y(75)}"/>
+            <path class="trend-area" d="${area}" fill="${levelColor(history[history.length - 1].level)}"/>
+            <polyline class="trend-line" points="${pts}" stroke="${levelColor(history[history.length - 1].level)}"/>
+            ${history.map((h, i) => `<circle class="trend-dot" cx="${x(i)}" cy="${y(h.score)}" r="3.5" fill="${levelColor(h.level)}"/>`).join('')}
+        </svg>`;
+}
+
+// ── Utilities ─────────────────────────────────────────────────────────────
 function showError(msg) { const e = document.getElementById('error-display'); e.textContent = msg; e.style.display = 'block'; e.className = 'error-message'; e.scrollIntoView({ behavior: 'smooth' }); }
 function hideError() { document.getElementById('error-display').style.display = 'none'; }
 function hideResults() { document.getElementById('results-section').style.display = 'none'; }
