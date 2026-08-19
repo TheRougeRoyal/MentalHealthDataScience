@@ -1,31 +1,27 @@
 /* ==========================================================================
-   Modern Medical Analytics Dashboard UI System
-   Envato / Healthcare Analytics Design Philosophy
+   Modern Data Science & Risk Analytics UI Design System
    ========================================================================== */
 
 @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap');
 
 :root, html[data-theme="dark"], body.dark {
-    /* Sleek Deep Dashboard Theme */
-    --bg-app: #0b0f17;
-    --bg-sidebar: #0f1623;
-    --bg-card: #151d2a;
-    --bg-card-hover: #1a2536;
-    --bg-input: #1c2738;
+    --bg-app: #080c14;
+    --bg-sidebar: #0e1420;
+    --bg-card: #131b28;
+    --bg-card-hover: #192334;
+    --bg-input: #1a2433;
     
-    --border-color: #233044;
-    --border-highlight: #334561;
+    --border-color: #212d3e;
+    --border-highlight: #2f3e54;
 
     --text-main: #f1f5f9;
-    --text-muted: #8a99ad;
-    --text-inverse: #0b0f17;
+    --text-muted: #8493a8;
+    --text-inverse: #080c14;
 
-    /* Accent & Brand Colors */
-    --brand-accent: #38bdf8; /* Medical Sky Blue */
-    --brand-accent-glow: rgba(56, 189, 248, 0.15);
+    --brand-accent: #38bdf8;
+    --brand-accent-glow: rgba(56, 189, 248, 0.12);
     --brand-purple: #818cf8;
 
-    /* Health & Status Semantics */
     --status-success: #10b981;
     --status-success-bg: rgba(16, 185, 129, 0.12);
     
@@ -35,19 +31,17 @@
     --status-danger: #ef4444;
     --status-danger-bg: rgba(239, 68, 68, 0.12);
 
-    /* Radii */
     --radius-card: 16px;
     --radius-input: 10px;
     --radius-btn: 10px;
     --radius-pill: 9999px;
 
-    --shadow-card: 0 4px 20px -2px rgba(0, 0, 0, 0.3);
-    --shadow-glass: inset 0 1px 1px 0 rgba(255, 255, 255, 0.05);
+    --shadow-card: 0 4px 24px -2px rgba(0, 0, 0, 0.35);
     --transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 html[data-theme="light"], body.light {
-    --bg-app: #f4f7fa;
+    --bg-app: #f4f7fb;
     --bg-sidebar: #ffffff;
     --bg-card: #ffffff;
     --bg-card-hover: #f8fafc;
@@ -74,7 +68,6 @@ html[data-theme="light"], body.light {
     --status-danger-bg: #fef2f2;
 
     --shadow-card: 0 4px 20px -2px rgba(0, 0, 0, 0.05);
-    --shadow-glass: none;
 }
 
 * {
@@ -92,7 +85,6 @@ body {
     min-height: 100vh;
 }
 
-/* ── App Grid Layout (Sidebar + Main Content area) ────────────────────────── */
 .app-wrapper {
     display: grid;
     grid-template-columns: 260px 1fr;
@@ -104,11 +96,10 @@ body {
         grid-template-columns: 1fr;
     }
     .app-sidebar {
-        display: none; /* Collapsible on mobile */
+        display: none;
     }
 }
 
-/* Sidebar Component */
 .app-sidebar {
     background-color: var(--bg-sidebar);
     border-right: 1px solid var(--border-color);
@@ -136,15 +127,12 @@ body {
     align-items: center;
     justify-content: center;
     color: #fff;
-    box-shadow: 0 4px 12px var(--brand-accent-glow);
 }
 
 .brand-title {
     font-size: 1.1rem;
     font-weight: 700;
-    letter-spacing: -0.02em;
     color: var(--text-main);
-    line-height: 1.2;
 }
 
 .brand-subtitle {
@@ -168,10 +156,8 @@ body {
     color: var(--text-muted);
     font-size: 0.9rem;
     font-weight: 500;
-    cursor: pointer;
     text-decoration: none;
     transition: var(--transition);
-    border: 1px solid transparent;
 }
 
 .nav-item:hover {
@@ -182,7 +168,6 @@ body {
 .nav-item.active {
     color: var(--brand-accent);
     background-color: var(--brand-accent-glow);
-    border-color: var(--brand-accent-glow);
     font-weight: 600;
 }
 
@@ -191,14 +176,12 @@ body {
     height: 20px;
 }
 
-/* Main Dashboard Area */
 .app-main {
     padding: 32px 36px;
     max-width: 1200px;
     width: 100%;
 }
 
-/* Header Component */
 .top-header {
     display: flex;
     justify-content: space-between;
@@ -212,7 +195,6 @@ body {
     letter-spacing: -0.02em;
 }
 
-/* Dashboard Metric Overview Cards Row */
 .stats-overview-grid {
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
@@ -252,16 +234,14 @@ body {
     font-size: 0.8rem;
     color: var(--text-muted);
     font-weight: 500;
-    margin-bottom: 2px;
 }
 
 .stat-info .stat-value {
-    font-size: 1.4rem;
+    font-size: 1.3rem;
     font-weight: 700;
     color: var(--text-main);
 }
 
-/* Card Component (Dashboard Panel) */
 .card {
     background-color: var(--bg-card);
     border: 1px solid var(--border-color);
@@ -269,7 +249,6 @@ body {
     padding: 24px 28px;
     margin-bottom: 28px;
     box-shadow: var(--shadow-card);
-    box-shadow: var(--shadow-glass);
     transition: border-color var(--transition);
 }
 
@@ -280,22 +259,17 @@ body {
 .card h2 {
     font-size: 1.2rem;
     font-weight: 700;
-    letter-spacing: -0.015em;
     color: var(--text-main);
     margin-bottom: 18px;
-    display: flex;
-    align-items: center;
-    gap: 10px;
 }
 
 .card h3 {
     font-size: 1rem;
     font-weight: 600;
     color: var(--text-main);
-    margin-bottom: 14px;
+    margin-bottom: 12px;
 }
 
-/* Crisis Banner Widget */
 .crisis-banner {
     border-color: rgba(239, 68, 68, 0.4);
     background: linear-gradient(135deg, rgba(239, 68, 68, 0.1) 0%, var(--bg-card) 100%);
@@ -333,7 +307,6 @@ body {
     font-weight: 600;
 }
 
-/* Forms & Inputs */
 .form-group {
     margin-bottom: 18px;
     display: flex;
@@ -362,10 +335,8 @@ body {
 
 .form-control:focus, input:focus, select:focus, textarea:focus {
     border-color: var(--brand-accent);
-    box-shadow: 0 0 0 3px var(--brand-accent-glow);
 }
 
-/* Buttons */
 .btn {
     display: inline-flex;
     align-items: center;
@@ -386,12 +357,10 @@ body {
 .btn-primary {
     background: linear-gradient(135deg, var(--brand-accent), var(--brand-purple));
     color: #ffffff;
-    box-shadow: 0 4px 14px var(--brand-accent-glow);
 }
 
 .btn-primary:hover {
     opacity: 0.92;
-    transform: translateY(-1px);
 }
 
 .btn-secondary {
@@ -402,53 +371,40 @@ body {
 
 .btn-secondary:hover {
     background-color: var(--bg-card-hover);
-    border-color: var(--border-highlight);
 }
 
-/* Tabs Navigation */
-.nav-tabs {
+.google-btn {
     display: flex;
-    gap: 6px;
-    background-color: var(--bg-input);
-    padding: 6px;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    width: 100%;
+    padding: 12px 24px;
+    background: #fff;
+    color: #3c4043;
+    border: 1px solid #dadce0;
     border-radius: var(--radius-btn);
-    border: 1px solid var(--border-color);
-    margin-bottom: 24px;
-}
-
-.tab-btn {
-    flex: 1;
-    padding: 10px 16px;
-    font-size: 0.85rem;
+    font-size: 0.9rem;
     font-weight: 600;
-    color: var(--text-muted);
-    background: transparent;
-    border: none;
-    border-radius: var(--radius-input);
     cursor: pointer;
-    transition: var(--transition);
-    text-align: center;
 }
 
-.tab-btn:hover {
-    color: var(--text-main);
+.or-divider {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    margin: 18px 0;
+    color: var(--text-muted);
+    font-size: 0.8rem;
 }
 
-.tab-btn.active {
-    background-color: var(--bg-card);
-    color: var(--text-main);
-    box-shadow: var(--shadow-card);
+.or-divider::before, .or-divider::after {
+    content: '';
+    flex: 1;
+    height: 1px;
+    background: var(--border-color);
 }
 
-.tab-content {
-    display: none;
-}
-
-.tab-content.active {
-    display: block;
-}
-
-/* Risk Gauge & Visualizations */
 .risk-visualization {
     display: grid;
     grid-template-columns: 220px 1fr;
@@ -470,56 +426,18 @@ body {
     padding: 18px;
 }
 
-.force-row {
-    display: grid;
-    grid-template-columns: 130px 1fr 50px;
-    align-items: center;
-    gap: 12px;
-    margin-bottom: 10px;
-    font-size: 0.85rem;
-}
-
-.force-bar-track {
-    height: 14px;
-    background: var(--bg-card);
-    border-radius: var(--radius-pill);
-    overflow: hidden;
-    position: relative;
-}
-
-.force-bar-fill {
-    position: absolute;
-    top: 0;
-    bottom: 0;
-    border-radius: var(--radius-pill);
-}
-
-/* Badges */
 .badge {
     padding: 4px 10px;
     border-radius: var(--radius-pill);
     font-size: 0.75rem;
     font-weight: 700;
     text-transform: uppercase;
-    letter-spacing: 0.04em;
 }
 
-.badge-low {
-    background-color: var(--status-success-bg);
-    color: var(--status-success);
-}
+.badge-low { background-color: var(--status-success-bg); color: var(--status-success); }
+.badge-medium { background-color: var(--status-warning-bg); color: var(--status-warning); }
+.badge-high { background-color: var(--status-danger-bg); color: var(--status-danger); }
 
-.badge-medium {
-    background-color: var(--status-warning-bg);
-    color: var(--status-warning);
-}
-
-.badge-high {
-    background-color: var(--status-danger-bg);
-    color: var(--status-danger);
-}
-
-/* Footer */
 footer {
     margin-top: 56px;
     padding-top: 24px;
@@ -527,8 +445,6 @@ footer {
     display: flex;
     justify-content: space-between;
     align-items: center;
-    flex-wrap: wrap;
-    gap: 16px;
     font-size: 0.8rem;
     color: var(--text-muted);
 }
@@ -536,8 +452,4 @@ footer {
 footer a {
     color: var(--text-muted);
     text-decoration: none;
-}
-
-footer a:hover {
-    color: var(--brand-accent);
 }
