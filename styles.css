@@ -374,19 +374,27 @@ body {
 }
 
 .google-btn {
-    display: flex;
+    display: inline-flex;
     align-items: center;
     justify-content: center;
-    gap: 10px;
-    width: 100%;
-    padding: 12px 24px;
+    gap: 8px;
+    width: auto;
+    max-width: 240px;
+    padding: 8px 16px;
     background: #fff;
     color: #3c4043;
     border: 1px solid #dadce0;
     border-radius: var(--radius-btn);
-    font-size: 0.9rem;
+    font-size: 0.85rem;
     font-weight: 600;
     cursor: pointer;
+    transition: var(--transition);
+}
+
+.google-btn svg {
+    width: 16px;
+    height: 16px;
+    flex-shrink: 0;
 }
 
 .or-divider {
