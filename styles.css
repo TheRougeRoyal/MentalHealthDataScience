@@ -191,6 +191,27 @@ body::after {
     display: grid;
     grid-template-columns: 270px 1fr;
     min-height: 100vh;
+    transition: grid-template-columns 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.app-wrapper.collapsed-sidebar {
+    grid-template-columns: 80px 1fr;
+}
+
+.app-wrapper.collapsed-sidebar .brand-title,
+.app-wrapper.collapsed-sidebar .brand-subtitle,
+.app-wrapper.collapsed-sidebar .nav-text {
+    display: none;
+}
+
+.app-wrapper.collapsed-sidebar .app-sidebar {
+    padding: 32px 14px;
+    align-items: center;
+}
+
+.app-wrapper.collapsed-sidebar .nav-item {
+    justify-content: center;
+    padding: 14px;
 }
 
 @media (max-width: 992px) {
@@ -233,6 +254,7 @@ body::after {
     position: sticky;
     top: 0;
     height: 100vh;
+    transition: var(--transition);
 }
 
 .sidebar-brand {
