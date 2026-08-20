@@ -143,6 +143,19 @@
                 </div>
             </div>
 
+            <section class="card" aria-label="Statistical analysis">
+                <div style="display:flex; justify-content:space-between; align-items:center; gap:12px; flex-wrap:wrap;">
+                    <div>
+                        <h2>Statistical Analysis</h2>
+                        <p style="color: var(--text-muted); font-size: 0.9rem; margin: 0;">Descriptive analysis of stored screening scores.</p>
+                    </div>
+                    <button onclick="checkSystemStatus()" class="btn btn-secondary">Refresh Analysis</button>
+                </div>
+                <div id="statistics-analysis" style="margin-top: 16px;">
+                    <p style="color: var(--text-muted);">Loading analysis...</p>
+                </div>
+            </section>
+
             <!-- Crisis Support -->
             <section id="crisis-section" class="card crisis-banner" aria-label="Crisis Resources">
                 <h2>Immediate Crisis Support</h2>

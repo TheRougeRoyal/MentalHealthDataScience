@@ -372,6 +372,32 @@ body::after {
     transform: translateY(-3px);
 }
 
+.analysis-grid {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 12px;
+}
+
+.analysis-grid > div {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    padding: 14px;
+    background: var(--bg-input);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-input);
+}
+
+.analysis-grid strong {
+    font-size: 1.1rem;
+}
+
+@media (max-width: 760px) {
+    .analysis-grid {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+}
+
 .stat-icon-box {
     width: 52px;
     height: 52px;

@@ -73,9 +73,21 @@ def test_batch_screen(client, mock_firebase):
     assert data["successful"] == 2
 
 
+def test_batch_screen_requires_consent_for_every_item(client, mock_firebase):
+    r = client.post("/batch-screen", headers={"Authorization": "Bearer fake-token"}, json={
+        "requests": [
+            {"anonymized_id": "batch_001", "consent_verified": True},
+            {"anonymized_id": "batch_002", "consent_verified": False},
+        ]
+    })
+    assert r.status_code == 403
+
+
 def test_statistics(client, mock_firebase):
     r = client.get("/statistics", headers={"Authorization": "Bearer fake-token"})
     assert r.status_code == 200
     data = r.json()
     assert "screenings" in data
+    assert "risk_distribution" in data
+    assert data["screenings"]["median_risk_score"] == 0
     assert "review_queue" in data

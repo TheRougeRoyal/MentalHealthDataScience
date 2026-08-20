@@ -227,6 +227,7 @@ async function checkSystemStatus() {
         const r = await fetch(`${API_BASE_URL}/statistics`, { headers: await authHeaders() });
         if (r.ok) {
             const s = await r.json();
+            renderStatistics(s);
             const sc = s.screenings || {};
             const q = s.review_queue || {};
             updateStatusElement('screenings-status', 'healthy', `${sc.total || 0} total`);
@@ -240,6 +241,21 @@ async function checkSystemStatus() {
         updateStatusElement('highrisk-status', 'error', 'Offline');
         updateStatusElement('queue-status', 'error', 'Offline');
     }
+}
+
+function renderStatistics(data) {
+    const stats = data.screenings || {};
+    const distribution = data.risk_distribution || {};
+    const target = document.getElementById('statistics-analysis');
+    if (!target) return;
+
+    target.innerHTML = `
+        <div class="analysis-grid">
+            <div><span class="stat-label">Average score</span><strong>${Number(stats.avg_risk_score || 0).toFixed(1)}</strong></div>
+            <div><span class="stat-label">Median score</span><strong>${Number(stats.median_risk_score || 0).toFixed(1)}</strong></div>
+            <div><span class="stat-label">Score range</span><strong>${Number(stats.min_risk_score || 0).toFixed(1)} - ${Number(stats.max_risk_score || 0).toFixed(1)}</strong></div>
+            <div><span class="stat-label">Risk groups</span><strong>${distribution.low || 0} low / ${distribution.moderate || 0} moderate / ${(distribution.high || 0) + (distribution.critical || 0)} high+</strong></div>
+        </div>`;
 }
 
 function updateStatusElement(id, status, text) {
@@ -286,7 +302,7 @@ async function submitScreening() {
         if (!r.ok) { const e = await r.json(); throw new Error(e.detail || `HTTP ${r.status}`); }
         displayResults(await r.json());
     } catch (e) {
-        if (e.message.includes('Failed to fetch') || e.message.includes('HTTP')) {
+        if (e.message.includes('Failed to fetch')) {
             const combined = { ...surveyData, ...wearableData, ...emrData };
             const calc = clientScore(combined);
             const factorStrings = Object.entries(calc.contributions).map(([k, v]) => {
@@ -338,11 +354,10 @@ async function submitBatchScreening() {
     }
     if (requests.length > 100) { showError('Maximum 100 requests per batch allowed'); return; }
 
-    // Ensure mandatory field consent_verified is present for each item
-    requests = requests.map(r => ({
-        ...r,
-        consent_verified: r.consent_verified !== undefined ? r.consent_verified : true
-    }));
+        if (requests.some(r => r.consent_verified !== true)) {
+            showError('Consent must be verified for every batch item');
+            return;
+        }
 
     showLoading(true); hideError();
     try {
@@ -359,7 +374,7 @@ async function submitBatchScreening() {
         displayBatchResults(await r.json());
     } catch (e) {
         // Fallback for client side preview if server API is offline or returns error
-        if (e.message.includes('Failed to fetch') || e.message.includes('HTTP')) {
+        if (e.message.includes('Failed to fetch')) {
             const fallbackResults = requests.map(req => {
                 const combined = { ...(req.survey_data || {}), ...(req.wearable_data || {}), ...(req.emr_data || {}) };
                 const calc = clientScore(combined);

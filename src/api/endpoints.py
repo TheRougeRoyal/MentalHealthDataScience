@@ -152,6 +152,9 @@ async def batch_screen(
     request: BatchScreeningRequest,
     auth: AuthResult = Depends(get_current_user),
 ) -> BatchScreeningResponse:
+    if any(not item.consent_verified for item in request.requests):
+        raise HTTPException(status_code=403, detail="Consent must be verified for every batch item")
+
     model = get_risk_model()
     db = get_firestore_client()
     results = []
@@ -331,18 +334,32 @@ async def get_statistics(auth: AuthResult = Depends(get_current_user)):
     db = get_firestore_client()
 
     screenings = list(db.collection("screenings").get())
-    total = len(screenings)
+    records = [screening.to_dict() for screening in screenings]
+    scores = [float(record.get("risk_score", 0)) for record in records]
+    total = len(scores)
+    levels = {level.value: 0 for level in RiskLevel}
+    for record in records:
+        level = str(record.get("risk_level", "low")).lower()
+        if level in levels:
+            levels[level] += 1
 
     if total == 0:
         return {
             "timestamp": time.time(),
-            "screenings": {"total": 0, "avg_risk_score": 0, "high_risk_count": 0, "high_risk_pct": 0},
+            "screenings": {
+                "total": 0, "avg_risk_score": 0, "median_risk_score": 0,
+                "min_risk_score": 0, "max_risk_score": 0,
+                "high_risk_count": 0, "high_risk_pct": 0,
+            },
+            "risk_distribution": levels,
             "review_queue": {"pending_count": 0},
         }
 
-    scores = [s.to_dict().get("risk_score", 0) for s in screenings]
     avg = sum(scores) / total
-    high = sum(1 for s in screenings if s.to_dict().get("risk_level") in ("high", "critical"))
+    ordered_scores = sorted(scores)
+    midpoint = total // 2
+    median = ordered_scores[midpoint] if total % 2 else (ordered_scores[midpoint - 1] + ordered_scores[midpoint]) / 2
+    high = levels[RiskLevel.HIGH.value] + levels[RiskLevel.CRITICAL.value]
 
     reviews = list(db.collection("reviews").where("status", "==", "pending").get())
 
@@ -351,8 +368,12 @@ async def get_statistics(auth: AuthResult = Depends(get_current_user)):
         "screenings": {
             "total": total,
             "avg_risk_score": round(avg, 2),
+            "median_risk_score": round(median, 2),
+            "min_risk_score": round(min(scores), 2),
+            "max_risk_score": round(max(scores), 2),
             "high_risk_count": high,
             "high_risk_pct": round((high / total * 100) if total else 0, 1),
         },
+        "risk_distribution": levels,
         "review_queue": {"pending_count": len(reviews)},
     }
