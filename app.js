@@ -289,20 +289,24 @@ async function submitScreening() {
         if (e.message.includes('Failed to fetch') || e.message.includes('HTTP')) {
             const combined = { ...surveyData, ...wearableData, ...emrData };
             const calc = clientScore(combined);
+            const factorStrings = Object.entries(calc.contributions).map(([k, v]) => {
+                const label = FEATURE_WEIGHTS[k]?.label || k;
+                return `${label}: elevated severity contribution (${(v * 100).toFixed(0)}%)`;
+            });
             displayResults({
                 risk_score: {
                     anonymized_id: anonymizedId,
                     score: calc.risk_score,
                     risk_level: calc.risk_level,
                     confidence: 0.85,
-                    contributing_factors: calc.contributing_factors,
+                    contributing_factors: factorStrings.length ? factorStrings : ["No elevated risk factors detected"],
                     timestamp: new Date().toISOString()
                 },
                 recommendations: [
                     { resource_type: "general", name: "Mental Wellness Resources", description: "Standard wellness support materials.", urgency: "routine" }
                 ],
                 explanations: {
-                    top_features: [["phq9_score", surveyData.phq9_score || 0], ["gad7_score", surveyData.gad7_score || 0]],
+                    top_features: Object.entries(calc.contributions).map(([k, v]) => [k, v]),
                     counterfactual: "Increasing sleep or reducing stress metrics lowers score.",
                     clinical_interpretation: "Risk estimated using client-side statistical engine."
                 },
@@ -359,13 +363,17 @@ async function submitBatchScreening() {
             const fallbackResults = requests.map(req => {
                 const combined = { ...(req.survey_data || {}), ...(req.wearable_data || {}), ...(req.emr_data || {}) };
                 const calc = clientScore(combined);
+                const factorStrings = Object.entries(calc.contributions).map(([k, v]) => {
+                    const label = FEATURE_WEIGHTS[k]?.label || k;
+                    return `${label}: elevated severity contribution (${(v * 100).toFixed(0)}%)`;
+                });
                 return {
                     risk_score: {
                         anonymized_id: req.anonymized_id || 'unnamed',
                         score: calc.risk_score,
                         risk_level: calc.risk_level,
                         confidence: 0.85,
-                        contributing_factors: calc.contributing_factors,
+                        contributing_factors: factorStrings.length ? factorStrings : ["No elevated risk factors detected"],
                         timestamp: new Date().toISOString()
                     },
                     alert_triggered: calc.risk_score >= 70,
