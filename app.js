@@ -378,10 +378,14 @@ async function submitScreening() {
     const emrData = {};
     const dxEl = document.getElementById('diagnosis-codes');
     const medsEl = document.getElementById('medications');
-    const dx = dxEl ? dxEl.value.trim() : '';
-    const meds = medsEl ? medsEl.value.trim() : '';
-    if (dx) emrData.diagnosis_codes = dx.split(',').map(c => c.trim());
-    if (meds) emrData.medications = meds.split(',').map(m => m.trim());
+    if (dxEl && dxEl.value) {
+        const dx = dxEl.value.trim();
+        if (dx) emrData.diagnosis_codes = dx.split(',').map(c => c.trim());
+    }
+    if (medsEl && medsEl.value) {
+        const meds = medsEl.value.trim();
+        if (meds) emrData.medications = meds.split(',').map(m => m.trim());
+    }
 
     const payload = { anonymized_id: anonymizedId, consent_verified: consent, timestamp: new Date().toISOString() };
     if (Object.keys(surveyData).length) payload.survey_data = surveyData;
@@ -658,14 +662,20 @@ function displayResults(data) {
     const gad7 = document.getElementById('gad7-score').value;
     const sleep = document.getElementById('sleep-hours').value;
     const hr = document.getElementById('avg-heart-rate').value;
-    const dx = document.getElementById('diagnosis-codes').value.trim();
-    const meds = document.getElementById('medications').value.trim();
+    const dxEl = document.getElementById('diagnosis-codes');
+    const medsEl = document.getElementById('medications');
     if (phq9) simInput.phq9_score = parseInt(phq9);
     if (gad7) simInput.gad7_score = parseInt(gad7);
     if (sleep) simInput.sleep_hours = parseFloat(sleep);
     if (hr) simInput.avg_heart_rate = parseInt(hr);
-    if (dx) simInput.diagnosis_codes = dx.split(',').map(c => c.trim());
-    if (meds) simInput.medications = meds.split(',').map(m => m.trim());
+    if (dxEl && dxEl.value) {
+        const dx = dxEl.value.trim();
+        if (dx) simInput.diagnosis_codes = dx.split(',').map(c => c.trim());
+    }
+    if (medsEl && medsEl.value) {
+        const meds = medsEl.value.trim();
+        if (meds) simInput.medications = meds.split(',').map(m => m.trim());
+    }
     if (Object.keys(simInput).length) setSimulatorBaseline(simInput, rs.score);
 
     const alerts = document.getElementById('alerts-display');
