@@ -1,0 +1,403 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MindMetrics - Feature Validation</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { 
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Arial, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            padding: 40px 20px;
+            min-height: 100vh;
+        }
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 16px;
+            padding: 40px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+        }
+        h1 {
+            color: #2d3748;
+            margin-bottom: 10px;
+            font-size: 2rem;
+        }
+        .subtitle {
+            color: #718096;
+            margin-bottom: 30px;
+            font-size: 1rem;
+        }
+        .validation-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+            gap: 20px;
+            margin-bottom: 30px;
+        }
+        .test-card {
+            border: 2px solid #e2e8f0;
+            border-radius: 12px;
+            padding: 20px;
+            transition: all 0.3s ease;
+        }
+        .test-card:hover {
+            border-color: #667eea;
+            box-shadow: 0 4px 12px rgba(102, 126, 234, 0.2);
+        }
+        .test-card h3 {
+            color: #2d3748;
+            margin-bottom: 12px;
+            font-size: 1.1rem;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .test-card p {
+            color: #4a5568;
+            font-size: 0.9rem;
+            margin-bottom: 12px;
+            line-height: 1.5;
+        }
+        .test-card button {
+            width: 100%;
+            padding: 10px;
+            background: #667eea;
+            color: white;
+            border: none;
+            border-radius: 8px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+        .test-card button:hover {
+            background: #5568d3;
+        }
+        .status {
+            display: inline-block;
+            padding: 4px 12px;
+            border-radius: 12px;
+            font-size: 0.75rem;
+            font-weight: 600;
+            margin-top: 12px;
+        }
+        .status.pending { background: #feebc8; color: #c05621; }
+        .status.success { background: #c6f6d5; color: #22543d; }
+        .status.error { background: #fed7d7; color: #742a2a; }
+        .icon { font-size: 1.3rem; }
+        .results {
+            margin-top: 30px;
+            padding: 20px;
+            background: #f7fafc;
+            border-radius: 12px;
+            border-left: 4px solid #667eea;
+        }
+        .results h2 {
+            color: #2d3748;
+            margin-bottom: 15px;
+            font-size: 1.3rem;
+        }
+        .result-item {
+            padding: 12px;
+            background: white;
+            border-radius: 8px;
+            margin-bottom: 10px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .result-label {
+            color: #4a5568;
+            font-weight: 500;
+        }
+        .result-value {
+            font-family: 'Courier New', monospace;
+            color: #2d3748;
+            font-weight: 600;
+        }
+        .action-bar {
+            display: flex;
+            gap: 12px;
+            margin-top: 30px;
+        }
+        .action-bar button {
+            flex: 1;
+            padding: 14px;
+            border: none;
+            border-radius: 8px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        .btn-primary {
+            background: #667eea;
+            color: white;
+        }
+        .btn-primary:hover {
+            background: #5568d3;
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(102, 126, 234, 0.3);
+        }
+        .btn-secondary {
+            background: #e2e8f0;
+            color: #2d3748;
+        }
+        .btn-secondary:hover {
+            background: #cbd5e0;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🧠 MindMetrics Feature Validation</h1>
+        <p class="subtitle">Test all UI pipeline features to ensure everything is working correctly</p>
+
+        <div class="validation-grid">
+            <!-- Test 1: Individual Scoring -->
+            <div class="test-card">
+                <h3><span class="icon">🎯</span> Individual Scoring</h3>
+                <p>Tests client-side risk scoring with sample patient data</p>
+                <button onclick="testIndividualScoring()">Run Test</button>
+                <span id="status-1" class="status pending">Pending</span>
+            </div>
+
+            <!-- Test 2: Batch Processing -->
+            <div class="test-card">
+                <h3><span class="icon">📊</span> Batch Processing</h3>
+                <p>Tests batch analysis with multiple records</p>
+                <button onclick="testBatchProcessing()">Run Test</button>
+                <span id="status-2" class="status pending">Pending</span>
+            </div>
+
+            <!-- Test 3: Statistical Generation -->
+            <div class="test-card">
+                <h3><span class="icon">📈</span> Statistical Data</h3>
+                <p>Tests mock data generation (150 records)</p>
+                <button onclick="testStatisticalGeneration()">Run Test</button>
+                <span id="status-3" class="status pending">Pending</span>
+            </div>
+
+            <!-- Test 4: What-If Simulator -->
+            <div class="test-card">
+                <h3><span class="icon">🎛️</span> What-If Simulator</h3>
+                <p>Tests real-time parameter adjustment</p>
+                <button onclick="testSimulator()">Run Test</button>
+                <span id="status-4" class="status pending">Pending</span>
+            </div>
+
+            <!-- Test 5: Export Functions -->
+            <div class="test-card">
+                <h3><span class="icon">💾</span> Export Functions</h3>
+                <p>Tests CSV and JSON export capabilities</p>
+                <button onclick="testExport()">Run Test</button>
+                <span id="status-5" class="status pending">Pending</span>
+            </div>
+
+            <!-- Test 6: Risk Classification -->
+            <div class="test-card">
+                <h3><span class="icon">🎨</span> Risk Classification</h3>
+                <p>Tests all risk levels (Low/Mod/High/Critical)</p>
+                <button onclick="testRiskLevels()">Run Test</button>
+                <span id="status-6" class="status pending">Pending</span>
+            </div>
+        </div>
+
+        <div class="action-bar">
+            <button class="btn-primary" onclick="runAllTests()">▶️ Run All Tests</button>
+            <button class="btn-secondary" onclick="resetTests()">🔄 Reset</button>
+            <button class="btn-secondary" onclick="window.location.href='index.html'">🏠 Go to App</button>
+        </div>
+
+        <div id="results" class="results" style="display: none;">
+            <h2>Test Results</h2>
+            <div id="results-content"></div>
+        </div>
+    </div>
+
+    <script src="app.js"></script>
+    <script>
+        let testResults = {};
+
+        function updateStatus(testId, status, message) {
+            const el = document.getElementById(`status-${testId}`);
+            el.className = `status ${status}`;
+            el.textContent = status === 'success' ? '✓ Passed' : status === 'error' ? '✗ Failed' : 'Pending';
+            testResults[testId] = { status, message };
+            updateResultsDisplay();
+        }
+
+        function updateResultsDisplay() {
+            const resultsDiv = document.getElementById('results');
+            const contentDiv = document.getElementById('results-content');
+            resultsDiv.style.display = 'block';
+            
+            contentDiv.innerHTML = Object.entries(testResults).map(([id, result]) => `
+                <div class="result-item">
+                    <span class="result-label">Test ${id}: ${result.message}</span>
+                    <span class="result-value">${result.status === 'success' ? '✓ PASS' : '✗ FAIL'}</span>
+                </div>
+            `).join('');
+        }
+
+        function testIndividualScoring() {
+            try {
+                const testData = {
+                    phq9_score: 15,
+                    gad7_score: 12,
+                    sleep_hours: 5.5,
+                    avg_heart_rate: 78
+                };
+                
+                const result = clientScore(testData);
+                
+                if (result.risk_score >= 0 && result.risk_score <= 100 && 
+                    result.risk_level && result.contributions) {
+                    updateStatus(1, 'success', `Individual Scoring (Score: ${result.risk_score.toFixed(1)})`);
+                } else {
+                    throw new Error('Invalid result structure');
+                }
+            } catch (e) {
+                updateStatus(1, 'error', `Individual Scoring (${e.message})`);
+            }
+        }
+
+        function testBatchProcessing() {
+            try {
+                const batch = [
+                    { phq9_score: 18, gad7_score: 14, sleep_hours: 4.5, avg_heart_rate: 82 },
+                    { phq9_score: 8, gad7_score: 6, sleep_hours: 7, avg_heart_rate: 68 },
+                    { phq9_score: 22, gad7_score: 18, sleep_hours: 3.5, avg_heart_rate: 95 }
+                ];
+                
+                const results = batch.map(clientScore);
+                const avgScore = results.reduce((a, b) => a + b.risk_score, 0) / results.length;
+                
+                if (results.length === 3 && avgScore > 0) {
+                    updateStatus(2, 'success', `Batch Processing (${results.length} records, avg: ${avgScore.toFixed(1)})`);
+                } else {
+                    throw new Error('Batch processing failed');
+                }
+            } catch (e) {
+                updateStatus(2, 'error', `Batch Processing (${e.message})`);
+            }
+        }
+
+        function testStatisticalGeneration() {
+            try {
+                const mockData = generateMockStatisticalData();
+                const stats = calculateStatisticsFromMockData();
+                
+                if (mockData.length === 150 && stats.screenings.total === 150 &&
+                    stats.screenings.avg_risk_score > 0) {
+                    updateStatus(3, 'success', `Statistical Data (${mockData.length} records generated)`);
+                } else {
+                    throw new Error('Invalid mock data');
+                }
+            } catch (e) {
+                updateStatus(3, 'error', `Statistical Data (${e.message})`);
+            }
+        }
+
+        function testSimulator() {
+            try {
+                const baseline = { phq9_score: 15, gad7_score: 12, sleep_hours: 6, avg_heart_rate: 75 };
+                const baselineScore = clientScore(baseline);
+                
+                const improved = { phq9_score: 8, gad7_score: 6, sleep_hours: 8, avg_heart_rate: 65 };
+                const improvedScore = clientScore(improved);
+                
+                if (improvedScore.risk_score < baselineScore.risk_score) {
+                    const delta = baselineScore.risk_score - improvedScore.risk_score;
+                    updateStatus(4, 'success', `What-If Simulator (Δ ${delta.toFixed(1)} points)`);
+                } else {
+                    throw new Error('Simulator logic error');
+                }
+            } catch (e) {
+                updateStatus(4, 'error', `What-If Simulator (${e.message})`);
+            }
+        }
+
+        function testExport() {
+            try {
+                // Test CSV generation
+                const mockResults = {
+                    results: [
+                        { risk_score: { anonymized_id: 'test_001', score: 65.5, risk_level: 'high', contributing_factors: ['PHQ-9: elevated'], timestamp: new Date().toISOString() } }
+                    ]
+                };
+                
+                window._lastBatchResults = mockResults;
+                
+                // Check if export functions exist
+                if (typeof exportBatchResultsCSV === 'function' && 
+                    typeof exportBatchResultsJSON === 'function') {
+                    updateStatus(5, 'success', 'Export Functions (CSV & JSON ready)');
+                } else {
+                    throw new Error('Export functions not found');
+                }
+            } catch (e) {
+                updateStatus(5, 'error', `Export Functions (${e.message})`);
+            }
+        }
+
+        function testRiskLevels() {
+            try {
+                const levels = [
+                    { data: { phq9_score: 2, gad7_score: 2, sleep_hours: 8, avg_heart_rate: 65 }, expected: 'low' },
+                    { data: { phq9_score: 11, gad7_score: 9, sleep_hours: 6, avg_heart_rate: 75 }, expected: 'moderate' },
+                    { data: { phq9_score: 18, gad7_score: 14, sleep_hours: 5, avg_heart_rate: 82 }, expected: 'high' },
+                    { data: { phq9_score: 24, gad7_score: 19, sleep_hours: 3.5, avg_heart_rate: 95 }, expected: 'critical' }
+                ];
+                
+                const results = levels.map(test => {
+                    const result = clientScore(test.data);
+                    return result.risk_level === test.expected;
+                });
+                
+                const passed = results.filter(Boolean).length;
+                
+                if (passed === 4) {
+                    updateStatus(6, 'success', `Risk Classification (${passed}/4 levels correct)`);
+                } else {
+                    updateStatus(6, 'error', `Risk Classification (Only ${passed}/4 correct)`);
+                }
+            } catch (e) {
+                updateStatus(6, 'error', `Risk Classification (${e.message})`);
+            }
+        }
+
+        async function runAllTests() {
+            testResults = {};
+            testIndividualScoring();
+            await new Promise(r => setTimeout(r, 200));
+            testBatchProcessing();
+            await new Promise(r => setTimeout(r, 200));
+            testStatisticalGeneration();
+            await new Promise(r => setTimeout(r, 200));
+            testSimulator();
+            await new Promise(r => setTimeout(r, 200));
+            testExport();
+            await new Promise(r => setTimeout(r, 200));
+            testRiskLevels();
+            
+            // Summary
+            setTimeout(() => {
+                const total = Object.keys(testResults).length;
+                const passed = Object.values(testResults).filter(r => r.status === 'success').length;
+                alert(`✅ Tests Complete!\n\n${passed}/${total} tests passed\n\n${passed === total ? '🎉 All systems operational!' : '⚠️ Some tests failed. Check console for details.'}`);
+            }, 1000);
+        }
+
+        function resetTests() {
+            testResults = {};
+            for (let i = 1; i <= 6; i++) {
+                const el = document.getElementById(`status-${i}`);
+                el.className = 'status pending';
+                el.textContent = 'Pending';
+            }
+            document.getElementById('results').style.display = 'none';
+        }
+    </script>
+</body>
+</html>

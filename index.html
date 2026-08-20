@@ -257,14 +257,23 @@
             <!-- Batch Assessment -->
             <section id="batch-section" class="card" aria-label="Batch Screening">
                 <h2>Batch Analytics</h2>
-                <p style="color: var(--text-muted); font-size: 0.9rem; margin-bottom: 16px;">Submit multiple records at once (JSON format, max 100)</p>
+                <p style="color: var(--text-muted); font-size: 0.9rem; margin-bottom: 16px;">Submit multiple records at once (JSON format, max 100). Batch processing uses the same statistical risk model as individual assessments.</p>
                 <div class="form-group">
                     <label for="batch-data">Batch Data Array</label>
                     <textarea id="batch-data" rows="6" placeholder='[{"anonymized_id": "patient_001", "consent_verified": true, "survey_data": {"phq9_score": 15, "gad7_score": 12}}]'></textarea>
-                    <button onclick="loadSampleBatchData()" class="btn btn-secondary" style="margin-top: 10px;">Load Sample Batch</button>
+                    <div style="display: flex; gap: 10px; margin-top: 10px;">
+                        <button onclick="loadSampleBatchData()" class="btn btn-secondary">Load Sample Batch</button>
+                        <button onclick="clearBatchData()" class="btn btn-secondary">Clear</button>
+                    </div>
                 </div>
                 <button onclick="submitBatchScreening()" class="btn btn-primary">Execute Batch Analysis</button>
-                <div id="batch-results" class="batch-results" style="display: none; margin-top: 16px;"></div>
+                <div id="batch-results" class="batch-results" style="display: none; margin-top: 16px;">
+                    <!-- Results will be inserted here -->
+                </div>
+                <div id="batch-export-section" style="display: none; margin-top: 16px;">
+                    <button onclick="exportBatchResultsCSV()" class="btn btn-secondary">📊 Export Results as CSV</button>
+                    <button onclick="exportBatchResultsJSON()" class="btn btn-secondary">📄 Export Results as JSON</button>
+                </div>
             </section>
 
             <!-- Review Queue -->
@@ -282,9 +291,40 @@
                 <div id="review-queue-list">
                     <p style="color: var(--text-muted);">Click "Refresh Queue" to load records.</p>
                 </div>
-                <div id="review-detail" style="display:none; margin-top: 20px;">
+                <div id="review-detail" style="display:none; margin-top: 20px; padding: 20px; background: var(--bg-input); border-radius: var(--radius-input); border: 1px solid var(--border-color);">
                     <h3>Reviewing Record: <span id="review-detail-id"></span></h3>
-                    <div id="review-detail-comments"></div>
+                    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 16px; margin: 16px 0;">
+                        <div>
+                            <div style="font-size: 0.85rem; color: var(--text-muted);">Patient ID</div>
+                            <div style="font-weight: 600; margin-top: 4px;" id="review-detail-patient">-</div>
+                        </div>
+                        <div>
+                            <div style="font-size: 0.85rem; color: var(--text-muted);">Risk Level</div>
+                            <div style="font-weight: 600; margin-top: 4px;" id="review-detail-risk">-</div>
+                        </div>
+                        <div>
+                            <div style="font-size: 0.85rem; color: var(--text-muted);">Risk Score</div>
+                            <div style="font-weight: 600; margin-top: 4px;" id="review-detail-score">-</div>
+                        </div>
+                        <div>
+                            <div style="font-size: 0.85rem; color: var(--text-muted);">Status</div>
+                            <div style="margin-top: 4px;"><span id="review-detail-status" class="badge">-</span></div>
+                        </div>
+                    </div>
+                    <div id="review-detail-comments" style="margin: 16px 0;"></div>
+                    <div class="form-group" style="margin: 16px 0;">
+                        <label for="review-assign-input">Assign to Reviewer (UID/Email)</label>
+                        <input type="text" id="review-assign-input" placeholder="reviewer@example.org">
+                    </div>
+                    <div class="form-group">
+                        <label for="review-comment-input">Add Note</label>
+                        <textarea id="review-comment-input" rows="3" placeholder="Enter review notes..."></textarea>
+                    </div>
+                    <div style="display: flex; gap: 10px; margin-top: 16px;">
+                        <button onclick="assignReview()" class="btn btn-secondary">Assign</button>
+                        <button onclick="commentReview()" class="btn btn-secondary">Save Note</button>
+                        <button onclick="closeReview()" class="btn btn-primary">Close Review</button>
+                    </div>
                 </div>
             </section>
 

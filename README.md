@@ -8,13 +8,64 @@ MHRAS is a web-based mental health screening system that combines evidence-based
 
 ## Features
 
+### Core Assessment Features
 - **Multi-factor Risk Assessment**: Evaluates mental health risk using PHQ-9, GAD-7, sleep patterns, heart rate, diagnosis codes, and medications
 - **Explainable AI**: Provides clinical explanations with contributing factors and counterfactual scenarios
 - **Role-Based Access Control**: Admin, reviewer, and user roles with server-side enforcement
 - **Clinical Review Workflow**: Enables healthcare professionals to review and manage flagged cases
 - **HIPAA Compliance**: Audit logging, encryption, and PHI handling per 45 CFR Part 164
 
+### UI-Only Mode Features
+- **🎯 Individual Assessments**: Real-time risk scoring with interactive what-if simulator
+- **📊 Batch Analytics**: Process up to 100 records simultaneously with visual distribution analysis
+- **📈 Statistical Dashboard**: Auto-generated mock data (150+ screenings) with real-time statistics
+- **💾 Export Capabilities**: Download batch results in CSV or JSON format
+- **🎨 Theme Support**: Dark/Light mode with persistent preference
+- **📱 Responsive Design**: Mobile-optimized interface
+- **🔄 Trend Tracking**: Local storage of screening history with sparkline visualization
+- **🎛️ What-If Simulator**: Interactive sliders to explore risk score changes
+
+### Batch Processing Pipeline
+```
+JSON Input → Validation → Individual Scoring → Aggregation → Visualization → Export
+            (consent)    (clientScore())     (distribution)  (charts)     (CSV/JSON)
+```
+
+**Batch Features:**
+- Risk distribution bar chart with color-coded levels
+- Summary statistics (total, successful, failed)
+- Individual result cards with badges
+- Alert and review flags
+- One-click export to CSV or JSON
+
 ## Quick Start
+
+### UI-Only Mode (No Backend Required)
+
+The platform includes a **fully functional UI-only mode** with mock data pipeline. All features work immediately without backend setup:
+
+```bash
+# Simply open in browser
+open index.html
+
+# Or use a local server
+python -m http.server 8080
+# Navigate to http://localhost:8080
+```
+
+**Features available in UI-only mode:**
+- ✅ Individual risk assessments with client-side scoring
+- ✅ Batch analytics (up to 100 records)
+- ✅ Statistical analysis (150 auto-generated mock screenings)
+- ✅ What-if simulator with real-time scoring
+- ✅ Review queue with demo cases
+- ✅ CSV/JSON export for batch results
+- ✅ Risk distribution visualizations
+- ✅ Interactive charts and gauges
+
+### Backend API Setup (Optional)
+
+For production deployment with persistent data storage:
 
 ### Prerequisites
 
@@ -62,6 +113,53 @@ python -m http.server 3000
 ```
 
 ## Architecture
+
+### UI-Only Mode Pipeline
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                    Browser (Client-Side)                        │
+│                                                                 │
+│   ┌─────────────────────────────────────────────────────────┐  │
+│   │              Frontend (index.html)                       │  │
+│   │   HTML5 · CSS3 · Vanilla JavaScript                      │  │
+│   └───────────────────┬─────────────────────────────────────┘  │
+│                       │                                         │
+│   ┌───────────────────▼─────────────────────────────────────┐  │
+│   │          Mock Data Pipeline (app.js)                     │  │
+│   │                                                           │  │
+│   │  ┌────────────────────────────────────────────────────┐ │  │
+│   │  │  generateMockStatisticalData()                     │ │  │
+│   │  │  → 150 realistic screening records                 │ │  │
+│   │  │  → Risk score distribution                         │ │  │
+│   │  └────────────────────────────────────────────────────┘ │  │
+│   │                                                           │  │
+│   │  ┌────────────────────────────────────────────────────┐ │  │
+│   │  │  clientScore()                                     │ │  │
+│   │  │  → Mirrors backend ClinicalRulesModel             │ │  │
+│   │  │  → PHQ-9, GAD-7, Sleep, HR weighting              │ │  │
+│   │  │  → Risk classification (Low/Med/High/Critical)    │ │  │
+│   │  └────────────────────────────────────────────────────┘ │  │
+│   │                                                           │  │
+│   │  ┌────────────────────────────────────────────────────┐ │  │
+│   │  │  Batch Processing                                  │ │  │
+│   │  │  → Parse JSON array                                │ │  │
+│   │  │  → Score each record                               │ │  │
+│   │  │  → Generate distribution chart                     │ │  │
+│   │  │  → Export to CSV/JSON                              │ │  │
+│   │  └────────────────────────────────────────────────────┘ │  │
+│   └───────────────────────────────────────────────────────────┘  │
+│                                                                 │
+│   ┌───────────────────────────────────────────────────────┐    │
+│   │  Local Storage                                         │    │
+│   │  → Trend history                                       │    │
+│   │  → Theme preference                                    │    │
+│   │  → Batch results cache                                 │    │
+│   └───────────────────────────────────────────────────────┘    │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+### Full Stack Architecture (Backend Connected)
 
 ```
 ┌─────────────────────────────────────────────────────────────────┐
