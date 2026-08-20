@@ -43,6 +43,10 @@ const _fbConfig = {
     apiKey: window.FIREBASE_API_KEY,
     authDomain: window.FIREBASE_AUTH_DOMAIN,
     projectId: window.FIREBASE_PROJECT_ID,
+    storageBucket: window.FIREBASE_STORAGE_BUCKET,
+    messagingSenderId: window.FIREBASE_MESSAGING_SENDER_ID,
+    appId: window.FIREBASE_APP_ID,
+    measurementId: window.FIREBASE_MEASUREMENT_ID,
 };
 const _fbConfigured = !!(window.FIREBASE_API_KEY && window.FIREBASE_AUTH_DOMAIN && window.FIREBASE_PROJECT_ID);
 if (!_fbConfigured) {
@@ -57,6 +61,7 @@ try {
 }
 
 const auth = firebase.auth();
+const db = firebase.firestore ? firebase.firestore() : null;
 const googleProvider = new firebase.auth.GoogleAuthProvider();
 googleProvider.setCustomParameters({ prompt: 'select_account' });
 
