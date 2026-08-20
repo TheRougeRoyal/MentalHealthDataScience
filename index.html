@@ -364,6 +364,17 @@
     </div>
 
     <!-- Scripts -->
+    <!--
+        Firebase web SDK config. Replace the three values below with your
+        Firebase project's web config (Project Settings → Your apps → Config).
+        Without these, app.js will show a sign-in error and refuse to init
+        rather than crash with a cryptic TDZ error.
+    -->
+    <script>
+        window.FIREBASE_API_KEY = "REPLACE_ME_API_KEY";
+        window.FIREBASE_AUTH_DOMAIN = "REPLACE_ME.firebaseapp.com";
+        window.FIREBASE_PROJECT_ID = "REPLACE_ME_PROJECT_ID";
+    </script>
     <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-auth-compat.js"></script>
     <script src="app.js"></script>

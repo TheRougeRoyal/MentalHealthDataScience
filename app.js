@@ -36,6 +36,25 @@ function updateThemeToggleUI(theme) {
 document.addEventListener('DOMContentLoaded', initTheme);
 
 // ── Firebase Auth ──────────────────────────────────────────────────────────
+// ponytail: minimal config — replace with your project's web config.
+// Missing config silently breaks firebase.auth() with a TDZ error
+// ("Cannot access 'auth' before initialization"), so keep this block.
+const _fbConfig = {
+    apiKey: window.FIREBASE_API_KEY,
+    authDomain: window.FIREBASE_AUTH_DOMAIN,
+    projectId: window.FIREBASE_PROJECT_ID,
+};
+const _fbConfigured = !!(window.FIREBASE_API_KEY && window.FIREBASE_AUTH_DOMAIN && window.FIREBASE_PROJECT_ID);
+if (!_fbConfigured) {
+    console.error('[firebase] Web SDK not configured. Set window.FIREBASE_API_KEY / FIREBASE_AUTH_DOMAIN / FIREBASE_PROJECT_ID before app.js loads. See index.html comments.');
+    showError('Sign-in is not configured for this deployment. Set Firebase web config in index.html.');
+}
+try {
+    if (!firebase.apps.length) firebase.initializeApp(_fbConfigured ? _fbConfig : { apiKey: 'invalid' });
+} catch (e) {
+    console.error('[firebase] initializeApp failed:', e);
+    showError(`Firebase init failed: ${e.message}`);
+}
 
 const auth = firebase.auth();
 const googleProvider = new firebase.auth.GoogleAuthProvider();
@@ -155,6 +174,19 @@ async function fetchMe() {
 window.addEventListener('DOMContentLoaded', () => {
     checkSystemStatus();
     initSimulator();
+
+    // ── Firebase self-check (ponytail: minimal regression guard) ──────────
+    // If this throws or _fbConfigured is false, we already showed an error above.
+    // Belt-and-suspenders: assert the auth handle is callable.
+    if (!_fbConfigured) return;
+    try {
+        // signOut() is a no-op when signed-out but proves the handle is wired.
+        auth.signOut().catch(() => {});
+    } catch (e) {
+        console.error('[firebase] self-check failed:', e);
+        showError(`Firebase auth unavailable: ${e.message}`);
+        return;
+    }
 
     auth.onAuthStateChanged(async (user) => {
         if (user) {
