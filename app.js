@@ -1,5 +1,5 @@
 const API_BASE_URL = ['localhost', '127.0.0.1'].includes(window.location.hostname)
-  ? 'http://localhost:8000'
+    ? `http://${window.location.hostname}:8000`
   : '/api';
 
 // ponytail: default role is 'user' until /auth/me confirms otherwise. Any
@@ -121,7 +121,7 @@ async function googleSignIn() {
     _redirectAfterLogin = true;
     try {
         await auth.signInWithPopup(googleProvider);
-        // onAuthStateChanged handles the rest
+        redirectToWorkspace();
     } catch (e) {
         if (e.code !== 'auth/popup-closed-by-user') {
             showError(`Google sign-in failed: ${e.message}`);
@@ -139,6 +139,7 @@ async function firebaseLogin() {
     _redirectAfterLogin = true;
     try {
         await auth.signInWithEmailAndPassword(email, password);
+        redirectToWorkspace();
     } catch (e) {
         showError(`Login failed: ${e.message}`);
         _redirectAfterLogin = false;
@@ -157,6 +158,7 @@ async function firebaseRegister() {
         const cred = await auth.createUserWithEmailAndPassword(email, password);
         // Set display name to the part before @
         await cred.user.updateProfile({ displayName: email.split('@')[0] });
+        redirectToWorkspace();
         showSuccess('Account created! You are now signed in.');
     } catch (e) {
         showError(`Registration failed: ${e.message}`);
@@ -348,6 +350,11 @@ function requireSignedIn() {
     if (_fbUser) return true;
     showError('Please sign in before using this workspace.');
     return false;
+}
+
+function redirectToWorkspace() {
+    if (document.body?.dataset?.page !== 'dashboard') return;
+    window.location.href = 'index.html#workspace-options';
 }
 
 // ── Status ────────────────────────────────────────────────────────────────
@@ -1248,7 +1255,14 @@ function renderTrend(container, anonymizedId) {
 }
 
 // ── Utilities ─────────────────────────────────────────────────────────────
-function showError(msg) { const e = document.getElementById('error-display'); e.textContent = msg; e.style.display = 'block'; e.className = 'error-message'; e.scrollIntoView({ behavior: 'smooth' }); }
+function showError(msg) {
+    const e = document.getElementById('error-display');
+    if (!e) { console.error(msg); return; }
+    e.textContent = msg;
+    e.style.display = 'block';
+    e.className = 'error-message';
+    e.scrollIntoView({ behavior: 'smooth' });
+}
 function hideError() { document.getElementById('error-display').style.display = 'none'; }
 function hideResults() { document.getElementById('results-section').style.display = 'none'; }
 function showSuccess(msg) { const e = document.getElementById('error-display'); e.className = 'success-message'; e.textContent = msg; e.style.display = 'block'; setTimeout(() => { e.style.display = 'none'; }, 3000); }
