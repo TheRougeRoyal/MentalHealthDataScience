@@ -103,6 +103,15 @@ cp .env.example .env
    `FIREBASE_AUTH_DOMAIN`, `FIREBASE_PROJECT_ID`, `FIREBASE_STORAGE_BUCKET`,
    `FIREBASE_MESSAGING_SENDER_ID`, and `FIREBASE_APP_ID`) in the backend
    deployment. The frontend loads these public values from `/api/auth/config`.
+7. In Firebase Authentication, enable **Email/Password** and **Google** sign-in.
+8. Add every deployed frontend hostname under **Authentication > Settings >
+    Authorized domains** (including `mental-health-data-science.vercel.app` and
+    `localhost` for local development).
+
+For Vercel, add the Firebase web variables in the project’s **Settings >
+Environment Variables** for the Production environment, then redeploy. Do not
+commit `.env`; the Firebase web API key is a public browser identifier, while
+the Admin service-account credentials must remain private.
 
 ### Running the Application
 
