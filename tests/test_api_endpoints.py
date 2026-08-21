@@ -24,6 +24,16 @@ def test_auth_me(client):
     assert data["role"] == "user"
 
 
+def test_firebase_config_is_public_only(client, monkeypatch):
+    monkeypatch.setenv("FIREBASE_API_KEY", "public-key")
+    monkeypatch.setenv("FIREBASE_PROJECT_ID", "public-project")
+    monkeypatch.setenv("FIREBASE_SERVICE_ACCOUNT_JSON", "secret-json")
+    r = client.get("/auth/config")
+    assert r.status_code == 200
+    assert r.json()["apiKey"] == "public-key"
+    assert "serviceAccount" not in r.json()
+
+
 def test_auth_me_no_token_is_rejected(client):
     """Missing tokens must never receive a development identity by default."""
     r = client.get("/auth/me")

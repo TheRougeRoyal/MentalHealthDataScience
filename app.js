@@ -92,6 +92,7 @@ let _fbConfigured = false;
 let auth = null;
 let db = null;
 let googleProvider = null;
+let _firebaseInitPromise = null;
 
 let _fbUser = null;
 
@@ -115,6 +116,7 @@ async function authHeaders() {
 // ── Auth UI ────────────────────────────────────────────────────────────────
 
 async function googleSignIn() {
+    if (!(await ensureFirebaseReady())) return;
     try {
         await auth.signInWithPopup(googleProvider);
         // onAuthStateChanged handles the rest
@@ -126,6 +128,7 @@ async function googleSignIn() {
 }
 
 async function firebaseLogin() {
+    if (!(await ensureFirebaseReady())) return;
     const email = document.getElementById('login-email').value.trim();
     const password = document.getElementById('login-password').value.trim();
     if (!email || !password) { showError('Please enter email and password'); return; }
@@ -138,6 +141,7 @@ async function firebaseLogin() {
 }
 
 async function firebaseRegister() {
+    if (!(await ensureFirebaseReady())) return;
     const email = document.getElementById('login-email').value.trim();
     const password = document.getElementById('login-password').value.trim();
     if (!email || !password) { showError('Please enter email and password'); return; }
@@ -154,6 +158,7 @@ async function firebaseRegister() {
 }
 
 async function firebaseLogout() {
+    if (!(await ensureFirebaseReady())) return;
     try {
         await auth.signOut();
     } catch (_) {}
@@ -267,7 +272,19 @@ window.addEventListener('DOMContentLoaded', () => {
     initializeFirebaseAuth();
 });
 
-async function initializeFirebaseAuth() {
+function initializeFirebaseAuth() {
+    _firebaseInitPromise = initializeFirebaseAuthInternal();
+    return _firebaseInitPromise;
+}
+
+async function ensureFirebaseReady() {
+    if (_firebaseInitPromise) await _firebaseInitPromise;
+    if (auth && googleProvider) return true;
+    showError('Sign-in is unavailable. Configure the Firebase web settings, then reload this page.');
+    return false;
+}
+
+async function initializeFirebaseAuthInternal() {
     let config = _inlineFbConfig;
     if (!config.apiKey || !config.authDomain || !config.projectId) {
         try {
@@ -278,7 +295,7 @@ async function initializeFirebaseAuth() {
 
     _fbConfigured = !!(config.apiKey && config.authDomain && config.projectId);
     if (!_fbConfigured) {
-        showError('Sign-in is not configured for this deployment. Set Firebase web config environment variables.');
+        showError('Sign-in is not configured. Set FIREBASE_API_KEY, FIREBASE_AUTH_DOMAIN, FIREBASE_PROJECT_ID, FIREBASE_MESSAGING_SENDER_ID, and FIREBASE_APP_ID in the deployment environment.');
         return;
     }
 
