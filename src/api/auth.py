@@ -106,29 +106,46 @@ def get_current_user(request: Request) -> AuthResult:
     else:
         provider = sign_in_provider
 
-    # Fetch or create user doc in Firestore
-    role = "user"
+    # Resolve role with strict isolation:
+    #   - ADMIN_EMAILS is the single bootstrap allowlist (sole admin = aakashrraj2@gmail.com).
+    #   - Firestore is the source of truth after first login: an admin can revoke
+    #     by setting role='user' and we won't re-promote unless the email is in ADMIN_EMAILS.
+    #   - Every other user is a plain 'user'. No 'reviewer' role is created by default.
+    ADMIN_EMAILS = {"aakashrraj2@gmail.com"}
+    is_admin_email = bool(email and email.lower() in ADMIN_EMAILS)
+    default_role = "admin" if is_admin_email else "user"
+    role = default_role
     try:
         db = get_firestore_client()
         user_doc = db.collection("users").document(uid).get()
         if user_doc.exists:
             user_data = user_doc.to_dict()
-            role = user_data.get("role", "user")
+            stored_role = user_data.get("role")
+            if is_admin_email:
+                # Admin email is always admin; never demote.
+                if stored_role != "admin":
+                    db.collection("users").document(uid).update({"role": "admin"})
+                role = "admin"
+            else:
+                # Plain users always get 'user' role — never inherit stale 'admin' or 'reviewer'.
+                role = "user"
+                if stored_role != "user":
+                    db.collection("users").document(uid).update({"role": "user"})
             display_name = user_data.get("display_name", display_name)
             photo_url = user_data.get("photo_url", photo_url)
         else:
-            # First login — auto-create user doc with default role
+            # First login — auto-create user doc
             new_user = {
                 "uid": uid,
                 "email": email,
                 "display_name": display_name,
                 "photo_url": photo_url,
-                "role": "user",
+                "role": default_role,
                 "provider": provider,
                 "created_at": _fs.SERVER_TIMESTAMP,
             }
             db.collection("users").document(uid).set(new_user, merge=True)
-            logger.info("Created Firestore user doc for %s (provider=%s)", uid, provider)
+            logger.info("Created Firestore user doc for %s (role=%s, provider=%s)", uid, default_role, provider)
     except Exception as e:
         logger.error("Failed to fetch/create user doc: %s", e)
 

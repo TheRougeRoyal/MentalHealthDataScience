@@ -2,6 +2,43 @@ const API_BASE_URL = window.location.hostname === 'localhost'
   ? 'http://localhost:8000'
   : '/api';
 
+// ponytail: default role is 'user' until /auth/me confirms otherwise. Any
+// admin-only UI is hidden by default so an unauthenticated visitor never
+// sees a patient list flash before login.
+window._currentRole = 'user';
+window._pageScope = document.body?.dataset?.page || 'dashboard';
+applyRoleGating('user');
+
+function guardPageAccess(role = window._currentRole || 'user') {
+    const page = document.body?.dataset?.page || 'dashboard';
+    const routePageNames = ['index.html', 'screening.html', 'batch.html', 'statistics.html', 'queue.html'];
+    const allowedByPage = {
+        dashboard: ['user', 'admin'],
+        screening: ['user', 'admin'],
+        batch: ['user', 'admin'],
+        statistics: ['user', 'admin'],
+        queue: ['admin']
+    };
+
+    if (routePageNames.includes(window.location.pathname.split('/').pop()) && page === 'queue' && role !== 'admin') {
+        window.location.href = 'index.html';
+        return false;
+    }
+
+    const allowed = allowedByPage[page] || ['user', 'admin'];
+    if (!allowed.includes(role)) {
+        window.location.href = 'index.html';
+        return false;
+    }
+
+    if (page === 'queue' && role !== 'admin') {
+        window.location.href = 'index.html';
+        return false;
+    }
+
+    return true;
+}
+
 // ── Theme Management (Dark by Default) ─────────────────────────────────────
 function initTheme() {
     const savedTheme = localStorage.getItem('theme') || 'dark';
@@ -170,10 +207,12 @@ async function fetchMe() {
         const r = await fetch(`${API_BASE_URL}/auth/me`, { headers: await authHeaders() });
         if (r.ok) {
             const u = await r.json();
+            // ponytail: role is the only thing that drives UI gating — cache it.
+            window._currentRole = u.role || 'user';
             const badge = document.getElementById('user-role-badge');
             if (badge) {
                 badge.textContent = u.role;
-                badge.className = `badge ${u.role === 'admin' ? 'badge-high' : u.role === 'reviewer' ? 'badge-medium' : 'badge-low'}`;
+                badge.className = `badge ${u.role === 'admin' ? 'badge-high' : 'badge-low'}`;
             }
             const displayName = u.display_name || u.email || u.uid;
             const dispEl = document.getElementById('user-display-name');
@@ -188,13 +227,50 @@ async function fetchMe() {
                     avatar.style.display = '';
                 }
             }
+
+            // Hide admin-only UI (review queue, patient list, statistics aggregation
+            // across all users, admin nav). Server still enforces — this is just UX.
+            applyRoleGating(u.role || 'user');
+            guardPageAccess(u.role || 'user');
         }
     } catch (_) {}
+}
+
+// ── Role-aware UI gating ───────────────────────────────────────────────────
+// Strict isolation between users and admins. Server-side rules are the source
+// of truth; this is purely to keep the right controls in front of the right
+// person so a user never *sees* a patient list they can't read.
+function applyRoleGating(role) {
+    const isAdmin = role === 'admin';
+
+    // Hide admin-only sections by ID prefix.
+    ['review-section', 'admin-section', 'patient-list-section'].forEach((id) => {
+        const el = document.getElementById(id);
+        if (el) el.style.display = isAdmin ? '' : 'none';
+    });
+
+    // Hide admin nav links.
+    document.querySelectorAll('[data-admin-only]').forEach((el) => {
+        el.style.display = isAdmin ? '' : 'none';
+    });
+
+    // For non-admins, the statistics panel must clearly say "your data only".
+    const statsScope = document.getElementById('statistics-scope-note');
+    if (statsScope) statsScope.textContent = isAdmin
+        ? 'Showing aggregate statistics across all patients.'
+        : 'Showing your screening history only. Other patients\' data is not accessible.';
+
+    // Clear any pre-loaded admin data from the DOM if a non-admin just signed in.
+    if (!isAdmin) {
+        const q = document.getElementById('review-queue-list');
+        if (q) q.innerHTML = '<p style="color: var(--text-muted);">Review queue is admin-only.</p>';
+    }
 }
 
 // ── Init ──────────────────────────────────────────────────────────────────
 
 window.addEventListener('DOMContentLoaded', () => {
+    guardPageAccess(window._currentRole || 'user');
     checkSystemStatus();
     initSimulator();
 

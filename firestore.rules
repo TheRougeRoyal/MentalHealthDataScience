@@ -12,47 +12,45 @@ service cloud.firestore {
       return request.auth != null && getUserRole() == "admin";
     }
 
-    function isReviewer() {
-      return request.auth != null && (getUserRole() == "admin" || getUserRole() == "reviewer");
-    }
-
     // ── Users collection ───────────────────────────────────────────────
+    // Strict isolation: users can ONLY read/write their own doc.
+    // Admins can read any user doc (e.g. to map uid → email for triage).
+    // Nobody can list all users client-side; listing happens via backend.
     match /users/{userId} {
-      // Users can read their own doc; admins can read any
-      allow read: if request.auth != null && (request.auth.uid == userId || isAdmin());
-
-      // Users can create their own doc on first login
+      allow read:   if request.auth != null && (request.auth.uid == userId || isAdmin());
       allow create: if request.auth != null && request.auth.uid == userId;
       allow update: if request.auth != null && (request.auth.uid == userId || isAdmin());
-      allow delete: if false;
+      allow delete: if isAdmin();
     }
 
     // ── Screenings collection ──────────────────────────────────────────
+    // Users can ONLY read screenings where user_id == their uid.
+    // Admins can read all.
+    // Create: any authenticated user, but they MUST stamp their own uid.
     match /screenings/{screeningId} {
-      // Users can only read screenings created by themselves (user_id field), admins/reviewers read all
-      allow read: if request.auth != null && (resource.data.user_id == request.auth.uid || isReviewer());
-      // Users can only create screenings stamped with their own uid
+      allow read:   if request.auth != null && (resource.data.user_id == request.auth.uid || isAdmin());
       allow create: if request.auth != null && request.resource.data.user_id == request.auth.uid;
-      allow update: if false;
-      allow delete: if false;
+      allow update: if isAdmin();
+      allow delete: if isAdmin();
     }
 
     // ── Explanations collection ────────────────────────────────────────
+    // Same isolation rule as screenings.
     match /explanations/{explanationId} {
-      // Users can only read explanations belonging to their own screenings, admins/reviewers read all
-      allow read: if request.auth != null && (resource.data.user_id == request.auth.uid || isReviewer());
+      allow read:   if request.auth != null && (resource.data.user_id == request.auth.uid || isAdmin());
       allow create: if request.auth != null && request.resource.data.user_id == request.auth.uid;
-      allow update: if false;
-      allow delete: if false;
+      allow update: if isAdmin();
+      allow delete: if isAdmin();
     }
 
     // ── Reviews collection ─────────────────────────────────────────────
+    // Only admins can read/create/update reviews.
+    // Non-admin users have ZERO access — their own screenings never appear here.
     match /reviews/{reviewId} {
-      // Users can read reviews of their own screenings; admins/reviewers can read all
-      allow read: if request.auth != null && (resource.data.user_id == request.auth.uid || isReviewer());
-      allow create: if request.auth != null;
-      allow update: if isReviewer();
-      allow delete: if false;
+      allow read:   if isAdmin();
+      allow create: if request.auth != null && request.resource.data.user_id == request.auth.uid;
+      allow update: if isAdmin();
+      allow delete: if isAdmin();
     }
 
     // ── Default: deny all other collections ────────────────────────────

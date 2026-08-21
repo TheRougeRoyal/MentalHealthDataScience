@@ -1,0 +1,114 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Mental Health Data Science | Batch Analytics</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body class="dark" data-page="batch">
+    <div class="mobile-nav-bar">
+        <div class="mobile-brand">MindMetrics AI</div>
+        <button class="mobile-menu-btn" onclick="toggleMobileMenu()">Menu</button>
+    </div>
+    <div id="mobile-drawer" class="mobile-drawer">
+        <a href="index.html" onclick="toggleMobileMenu()" class="nav-item">Dashboard</a>
+        <a href="screening.html" onclick="toggleMobileMenu()" class="nav-item">Screening Tool</a>
+        <a href="batch.html" onclick="toggleMobileMenu()" class="nav-item active">Batch Analytics</a>
+        <a href="statistics.html" onclick="toggleMobileMenu()" class="nav-item">Statistical Analysis</a>
+        <a href="queue.html" onclick="toggleMobileMenu()" class="nav-item" data-admin-only>Review Queue</a>
+        <button onclick="toggleTheme()" class="btn btn-secondary" style="margin-top:auto;">Toggle Theme</button>
+    </div>
+
+    <div class="app-wrapper" id="app-wrapper">
+        <aside class="app-sidebar">
+            <div class="sidebar-brand" style="display:flex; justify-content:space-between; align-items:center; width:100%;">
+                <div style="display:flex; align-items:center; gap:10px;">
+                    <div class="brand-icon" style="width:32px; height:32px; border-radius:6px; background:var(--bg-input); border:1px solid var(--border-color); display:flex; align-items:center; justify-content:center;">🧠</div>
+                    <div>
+                        <div class="brand-title" style="font-size:0.95rem; font-weight:600; letter-spacing:-0.01em;">MindMetrics AI</div>
+                        <div class="brand-subtitle" style="font-size:0.75rem; color:var(--text-muted);">Risk Data Science</div>
+                    </div>
+                </div>
+            </div>
+            <nav class="sidebar-nav">
+                <a href="index.html" class="nav-item" title="Dashboard">Dashboard</a>
+                <a href="screening.html" class="nav-item" title="Screening Tool">Screening Tool</a>
+                <a href="batch.html" class="nav-item active" title="Batch Analytics">Batch Analytics</a>
+                <a href="statistics.html" class="nav-item" title="Statistical Analysis">Statistical Analysis</a>
+                <a href="queue.html" class="nav-item" title="Review Queue" data-admin-only>Review Queue</a>
+            </nav>
+        </aside>
+
+        <main class="app-main">
+            <header class="top-header">
+                <div>
+                    <h1>Batch Analytics</h1>
+                    <p style="color: var(--text-muted); font-size: 0.85rem; margin-top:2px;">Run multi-record screening workflows in isolation</p>
+                </div>
+                <div style="display:flex; align-items:center; gap:12px;">
+                    <div id="user-header-pill" style="display:none; align-items:center; gap:10px; padding:6px 12px; background:var(--bg-card); border:1px solid var(--border-color); border-radius:var(--radius-pill);">
+                        <img id="user-avatar" src="" alt="Avatar" style="width:26px; height:26px; border-radius:50%; display:none; object-fit:cover;">
+                        <span id="header-user-name" style="font-size:0.85rem; font-weight:600;">Guest</span>
+                        <span id="user-role-badge" class="badge badge-low" style="font-size:0.7rem;">User</span>
+                    </div>
+                    <button id="theme-toggle-btn" onclick="toggleTheme()" class="btn btn-secondary" title="Toggle theme">Toggle Theme</button>
+                </div>
+            </header>
+
+            <section id="auth-section" class="card" aria-label="Authentication">
+                <h2>Researcher & Practitioner Login</h2>
+                <div id="login-form">
+                    <button onclick="googleSignIn()" class="google-btn" type="button">Sign in with Google Provider</button>
+                    <div class="or-divider">or email login</div>
+                    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 16px;">
+                        <div class="form-group">
+                            <label for="login-email">Account Email</label>
+                            <input type="email" id="login-email" placeholder="user@example.org">
+                        </div>
+                        <div class="form-group">
+                            <label for="login-password">Password</label>
+                            <input type="password" id="login-password" placeholder="••••••••">
+                        </div>
+                    </div>
+                    <div style="display:flex;gap:10px;margin-top:8px;">
+                        <button onclick="firebaseLogin()" class="btn btn-primary">Sign In</button>
+                        <button onclick="firebaseRegister()" class="btn btn-secondary">Register Account</button>
+                    </div>
+                </div>
+                <div id="user-info" style="display:none;">
+                    <p style="font-size:0.95rem;">Authenticated as <strong id="user-display-name"></strong> <span id="user-role-badge" class="badge badge-low">User</span></p>
+                    <button onclick="firebaseLogout()" class="btn btn-secondary" style="margin-top:12px;">Sign Out</button>
+                </div>
+            </section>
+
+            <section id="batch-section" class="card" aria-label="Batch Screening">
+                <h2>Batch Analytics</h2>
+                <p style="color: var(--text-muted); font-size: 0.9rem; margin-bottom: 16px;">Submit multiple records at once (JSON format, max 100). Batch processing uses the same statistical risk model as individual assessments.</p>
+                <div class="form-group">
+                    <label for="batch-data">Batch Data Array</label>
+                    <textarea id="batch-data" rows="8" placeholder='[{"anonymized_id": "patient_001", "consent_verified": true, "survey_data": {"phq9_score": 15, "gad7_score": 12}}]'></textarea>
+                    <div style="display: flex; gap: 10px; margin-top: 10px;">
+                        <button onclick="loadSampleBatchData()" class="btn btn-secondary">Load Sample Batch</button>
+                        <button onclick="clearBatchData()" class="btn btn-secondary">Clear</button>
+                    </div>
+                </div>
+                <button onclick="submitBatchScreening()" class="btn btn-primary">Execute Batch Analysis</button>
+                <div id="batch-results" class="batch-results" style="display: none; margin-top: 16px;"></div>
+                <div id="batch-export-section" style="display: none; margin-top: 16px;">
+                    <button onclick="exportBatchResultsCSV()" class="btn btn-secondary">📊 Export Results as CSV</button>
+                    <button onclick="exportBatchResultsJSON()" class="btn btn-secondary">📄 Export Results as JSON</button>
+                </div>
+            </section>
+        </main>
+    </div>
+
+    <script src="https://www.gstatic.com/firebasejs/9.6.10/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.6.10/firebase-auth-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.6.10/firebase-firestore-compat.js"></script>
+    <script src="app.js"></script>
+</body>
+</html>

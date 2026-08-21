@@ -215,19 +215,29 @@ def _generate_review_notes(status: str) -> str:
 
 
 def generate_users(count: int = 5) -> list[dict]:
-    """Generate synthetic user documents."""
+    """Generate synthetic user documents (one admin, the rest plain users)."""
     users = []
-    roles = ["admin", "reviewer", "reviewer", "user", "user", "user"]
+    # ponytail: the bootstrap allowlist is the source of truth — seed only
+    # mirrors that. In production no synthetic users are created.
+    admin_email = "aakashrraj2@gmail.com"
     for i in range(count):
         uid = f"synth_user_{i:03d}_{uuid.uuid4().hex[:6]}"
-        first = _pick(FIRST_NAMES)
-        last = _pick(LAST_NAMES)
+        if i == 0:
+            email = admin_email
+            role = "admin"
+            display_name = "Admin"
+        else:
+            first = _pick(FIRST_NAMES)
+            last = _pick(LAST_NAMES)
+            email = f"{first.lower()}.{last.lower()}@example.com"
+            role = "user"
+            display_name = f"{first} {last}"
         users.append({
             "uid": uid,
-            "email": f"{first.lower()}.{last.lower()}@example.com",
-            "display_name": f"{first} {last}",
+            "email": email,
+            "display_name": display_name,
             "photo_url": None,
-            "role": roles[i % len(roles)],
+            "role": role,
             "provider": random.choice(["google", "email"]),
             "created_at": datetime.now(timezone.utc) - timedelta(days=random.randint(1, 90)),
         })

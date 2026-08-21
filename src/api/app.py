@@ -82,9 +82,11 @@ async def general_exception_handler(request: Request, exc: Exception):
 from src.api.auth import router as auth_router
 from src.api.reviews import router as reviews_router
 from src.api.endpoints import router as endpoints_router
+from src.api.admin import router as admin_router
 
 app.include_router(auth_router)
 app.include_router(endpoints_router)
+app.include_router(admin_router)
 app.include_router(reviews_router)
 
 

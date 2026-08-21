@@ -37,7 +37,7 @@
         <a href="#overview" onclick="toggleMobileMenu()" class="nav-item active">Dashboard</a>
         <a href="#screening-section" onclick="toggleMobileMenu()" class="nav-item">Screening Tool</a>
         <a href="#batch-section" onclick="toggleMobileMenu()" class="nav-item">Batch Analytics</a>
-        <a href="#review-section" onclick="toggleMobileMenu()" class="nav-item">Review Queue</a>
+        <a href="#review-section" onclick="toggleMobileMenu()" class="nav-item" data-admin-only>Review Queue</a>
         <button onclick="toggleTheme()" class="btn btn-secondary" style="margin-top: auto;">Toggle Theme</button>
     </div>
 
@@ -78,7 +78,7 @@
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
                     <span class="nav-text">Batch Analytics</span>
                 </a>
-                <a href="#review-section" class="nav-item" title="Review Queue">
+                <a href="#review-section" class="nav-item" title="Review Queue" data-admin-only>
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
                     <span class="nav-text">Review Queue</span>
                 </a>
@@ -154,7 +154,7 @@
                 <div style="display:flex; justify-content:space-between; align-items:center; gap:12px; flex-wrap:wrap;">
                     <div>
                         <h2>Statistical Analysis</h2>
-                        <p style="color: var(--text-muted); font-size: 0.9rem; margin: 0;">Descriptive analysis of stored screening scores.</p>
+                        <p id="statistics-scope-note" style="color: var(--text-muted); font-size: 0.9rem; margin: 0;">Descriptive analysis of stored screening scores.</p>
                     </div>
                     <button onclick="checkSystemStatus()" class="btn btn-secondary">Refresh Analysis</button>
                 </div>
