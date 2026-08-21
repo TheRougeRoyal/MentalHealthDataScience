@@ -99,6 +99,10 @@ cp .env.example .env
 3. Create a **Firestore Database**
 4. Generate a service account key and save as `service-account.json`
 5. Deploy Firestore rules: `firebase deploy --only firestore:rules`
+6. Set the Firebase web config environment variables (`FIREBASE_API_KEY`,
+   `FIREBASE_AUTH_DOMAIN`, `FIREBASE_PROJECT_ID`, `FIREBASE_STORAGE_BUCKET`,
+   `FIREBASE_MESSAGING_SENDER_ID`, and `FIREBASE_APP_ID`) in the backend
+   deployment. The frontend loads these public values from `/api/auth/config`.
 
 ### Running the Application
 

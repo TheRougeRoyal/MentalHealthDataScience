@@ -24,10 +24,10 @@ def test_auth_me(client):
     assert data["role"] == "user"
 
 
-def test_auth_me_no_token_dev_mode(client):
-    """In development mode, missing token falls back to dev_user."""
+def test_auth_me_no_token_is_rejected(client):
+    """Missing tokens must never receive a development identity by default."""
     r = client.get("/auth/me")
-    assert r.status_code == 200
+    assert r.status_code == 401
 
 
 def test_screen(client, mock_firebase):

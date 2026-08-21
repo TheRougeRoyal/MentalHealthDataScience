@@ -53,14 +53,14 @@ class UserInfo(BaseModel):
 def get_current_user(request: Request) -> AuthResult:
     """Extract and verify the Firebase ID token from the Authorization header.
 
-    In development mode, missing tokens fall back to a dev admin identity.
+    A development bypass is opt-in and must never be enabled by default.
     """
     from src.firebase_admin import verify_id_token, get_firestore_client
 
     auth_header = request.headers.get("Authorization", "")
 
     if not auth_header.startswith("Bearer "):
-        if os.environ.get("ENVIRONMENT", "development") == "development":
+        if os.environ.get("ALLOW_DEV_AUTH_BYPASS", "").lower() == "true":
             return AuthResult(
                 authenticated=True,
                 user_id="dev_user",
@@ -183,6 +183,20 @@ def require_role(*allowed_roles: str):
 # ---------------------------------------------------------------------------
 
 router = APIRouter(prefix="/auth", tags=["Authentication"])
+
+
+@router.get("/config")
+async def firebase_config():
+    """Return only the public Firebase web configuration for the frontend."""
+    return {
+        "apiKey": os.environ.get("FIREBASE_API_KEY", ""),
+        "authDomain": os.environ.get("FIREBASE_AUTH_DOMAIN", ""),
+        "projectId": os.environ.get("FIREBASE_PROJECT_ID", ""),
+        "storageBucket": os.environ.get("FIREBASE_STORAGE_BUCKET", ""),
+        "messagingSenderId": os.environ.get("FIREBASE_MESSAGING_SENDER_ID", ""),
+        "appId": os.environ.get("FIREBASE_APP_ID", ""),
+        "measurementId": os.environ.get("FIREBASE_MEASUREMENT_ID", ""),
+    }
 
 
 @router.get("/me")

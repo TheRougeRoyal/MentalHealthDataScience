@@ -6,6 +6,7 @@ const API_BASE_URL = window.location.hostname === 'localhost'
 // admin-only UI is hidden by default so an unauthenticated visitor never
 // sees a patient list flash before login.
 window._currentRole = 'user';
+window._authReady = false;
 window._pageScope = document.body?.dataset?.page || 'dashboard';
 applyRoleGating('user');
 
@@ -19,6 +20,11 @@ function guardPageAccess(role = window._currentRole || 'user') {
         statistics: ['user', 'admin'],
         queue: ['admin']
     };
+
+    if (window._authReady && !_fbUser) {
+        if (page !== 'dashboard') window.location.href = 'index.html';
+        return page === 'dashboard';
+    }
 
     if (routePageNames.includes(window.location.pathname.split('/').pop()) && page === 'queue' && role !== 'admin') {
         window.location.href = 'index.html';
@@ -73,10 +79,7 @@ function updateThemeToggleUI(theme) {
 document.addEventListener('DOMContentLoaded', initTheme);
 
 // ── Firebase Auth ──────────────────────────────────────────────────────────
-// ponytail: minimal config — replace with your project's web config.
-// Missing config silently breaks firebase.auth() with a TDZ error
-// ("Cannot access 'auth' before initialization"), so keep this block.
-const _fbConfig = {
+const _inlineFbConfig = {
     apiKey: window.FIREBASE_API_KEY,
     authDomain: window.FIREBASE_AUTH_DOMAIN,
     projectId: window.FIREBASE_PROJECT_ID,
@@ -85,22 +88,10 @@ const _fbConfig = {
     appId: window.FIREBASE_APP_ID,
     measurementId: window.FIREBASE_MEASUREMENT_ID,
 };
-const _fbConfigured = !!(window.FIREBASE_API_KEY && window.FIREBASE_AUTH_DOMAIN && window.FIREBASE_PROJECT_ID);
-if (!_fbConfigured) {
-    console.error('[firebase] Web SDK not configured. Set window.FIREBASE_API_KEY / FIREBASE_AUTH_DOMAIN / FIREBASE_PROJECT_ID before app.js loads. See index.html comments.');
-    showError('Sign-in is not configured for this deployment. Set Firebase web config in index.html.');
-}
-try {
-    if (!firebase.apps.length) firebase.initializeApp(_fbConfigured ? _fbConfig : { apiKey: 'invalid' });
-} catch (e) {
-    console.error('[firebase] initializeApp failed:', e);
-    showError(`Firebase init failed: ${e.message}`);
-}
-
-const auth = firebase.auth();
-const db = firebase.firestore ? firebase.firestore() : null;
-const googleProvider = new firebase.auth.GoogleAuthProvider();
-googleProvider.setCustomParameters({ prompt: 'select_account' });
+let _fbConfigured = false;
+let auth = null;
+let db = null;
+let googleProvider = null;
 
 let _fbUser = null;
 
@@ -273,21 +264,38 @@ window.addEventListener('DOMContentLoaded', () => {
     guardPageAccess(window._currentRole || 'user');
     checkSystemStatus();
     initSimulator();
+    initializeFirebaseAuth();
+});
 
-    // ── Firebase self-check (ponytail: minimal regression guard) ──────────
-    // If this throws or _fbConfigured is false, we already showed an error above.
-    // Belt-and-suspenders: assert the auth handle is callable.
-    if (!_fbConfigured) return;
+async function initializeFirebaseAuth() {
+    let config = _inlineFbConfig;
+    if (!config.apiKey || !config.authDomain || !config.projectId) {
+        try {
+            const response = await fetch(`${API_BASE_URL}/auth/config`);
+            if (response.ok) config = await response.json();
+        } catch (_) {}
+    }
+
+    _fbConfigured = !!(config.apiKey && config.authDomain && config.projectId);
+    if (!_fbConfigured) {
+        showError('Sign-in is not configured for this deployment. Set Firebase web config environment variables.');
+        return;
+    }
+
     try {
-        // signOut() is a no-op when signed-out but proves the handle is wired.
-        auth.signOut().catch(() => {});
+        if (!firebase.apps.length) firebase.initializeApp(config);
+        auth = firebase.auth();
+        db = firebase.firestore ? firebase.firestore() : null;
+        googleProvider = new firebase.auth.GoogleAuthProvider();
+        googleProvider.setCustomParameters({ prompt: 'select_account' });
     } catch (e) {
-        console.error('[firebase] self-check failed:', e);
-        showError(`Firebase auth unavailable: ${e.message}`);
+        console.error('[firebase] initializeApp failed:', e);
+        showError(`Firebase init failed: ${e.message}`);
         return;
     }
 
     auth.onAuthStateChanged(async (user) => {
+        window._authReady = true;
         if (user) {
             _fbUser = user;
             // Refresh token on auth state change to keep it fresh
@@ -296,12 +304,22 @@ window.addEventListener('DOMContentLoaded', () => {
             checkSystemStatus();
         } else {
             _fbUser = null;
+            window._currentRole = 'user';
+            applyRoleGating('user');
             document.getElementById('login-form').style.display = '';
             document.getElementById('user-info').style.display = 'none';
-            document.getElementById('user-avatar').style.display = 'none';
+            const avatar = document.getElementById('user-avatar');
+            if (avatar) avatar.style.display = 'none';
+            guardPageAccess('user');
         }
     });
-});
+}
+
+function requireSignedIn() {
+    if (_fbUser) return true;
+    showError('Please sign in before using this workspace.');
+    return false;
+}
 
 // ── Status ────────────────────────────────────────────────────────────────
 
@@ -493,6 +511,7 @@ function updateStatusElement(id, status, text) {
 // ── Screening ─────────────────────────────────────────────────────────────
 
 async function submitScreening() {
+    if (!requireSignedIn()) return;
     const anonymizedId = document.getElementById('anonymized-id').value.trim();
     const consent = document.getElementById('consent-verified').checked;
     if (!anonymizedId) { showError('Please enter an anonymized identifier'); return; }
@@ -533,37 +552,7 @@ async function submitScreening() {
         if (!r.ok) { const e = await r.json(); throw new Error(e.detail || `HTTP ${r.status}`); }
         displayResults(await r.json());
     } catch (e) {
-        if (e.message.includes('Failed to fetch')) {
-            const combined = { ...surveyData, ...wearableData, ...emrData };
-            const calc = clientScore(combined);
-            const factorStrings = Object.entries(calc.contributions).map(([k, v]) => {
-                const label = FEATURE_WEIGHTS[k]?.label || k;
-                return `${label}: elevated severity contribution (${(v * 100).toFixed(0)}%)`;
-            });
-            displayResults({
-                risk_score: {
-                    anonymized_id: anonymizedId,
-                    score: calc.risk_score,
-                    risk_level: calc.risk_level,
-                    confidence: 0.85,
-                    contributing_factors: factorStrings.length ? factorStrings : ["No elevated risk factors detected"],
-                    timestamp: new Date().toISOString()
-                },
-                recommendations: [
-                    { resource_type: "general", name: "Mental Wellness Resources", description: "Standard wellness support materials.", urgency: "routine" }
-                ],
-                explanations: {
-                    top_features: Object.entries(calc.contributions).map(([k, v]) => [k, v]),
-                    counterfactual: "Increasing sleep or reducing stress metrics lowers score.",
-                    clinical_interpretation: "Risk estimated using client-side statistical engine."
-                },
-                requires_human_review: calc.risk_score >= 50,
-                alert_triggered: calc.risk_score >= 70
-            });
-            showSuccess('Statistical risk assessment computed!');
-        } else {
-            showError(`Assessment failed: ${e.message}`);
-        }
+        showError(`Assessment failed: ${e.message}`);
     }
     finally { showLoading(false); }
 }
@@ -571,6 +560,7 @@ async function submitScreening() {
 // ── Batch ─────────────────────────────────────────────────────────────────
 
 async function submitBatchScreening() {
+    if (!requireSignedIn()) return;
     const raw = document.getElementById('batch-data').value.trim();
     if (!raw) { showError('Please enter batch data'); return; }
     let requests;

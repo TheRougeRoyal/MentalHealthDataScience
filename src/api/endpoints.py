@@ -180,6 +180,7 @@ async def batch_screen(
             db.collection("screenings").document(screening_id).set({
                 "id": screening_id,
                 "anonymized_id": req.anonymized_id,
+                "user_id": auth.user_id,
                 "risk_score": a.risk_score,
                 "risk_level": a.risk_level,
                 "input_data": combined,
@@ -189,6 +190,7 @@ async def batch_screen(
             db.collection("explanations").document(screening_id).set({
                 "id": screening_id,
                 "screening_id": screening_id,
+                "user_id": auth.user_id,
                 "explanation_text": a.clinical_interpretation,
                 "factors": {
                     "contributing_factors": a.contributing_factors,
@@ -203,6 +205,7 @@ async def batch_screen(
                 db.collection("reviews").document(screening_id).set({
                     "id": screening_id,
                     "screening_id": screening_id,
+                    "user_id": auth.user_id,
                     "status": "pending",
                     "reviewer_uid": None,
                     "notes": None,
@@ -256,7 +259,7 @@ async def get_risk_score(
 ):
     db = get_firestore_client()
     query = db.collection("screenings").where("anonymized_id", "==", anonymized_id)
-    if auth.role not in ("admin", "reviewer"):
+    if auth.role != "admin":
         query = query.where("user_id", "==", auth.user_id)
     docs = list(query.get())
 
@@ -286,11 +289,11 @@ async def explain_prediction(
         screening_doc = db.collection("screenings").document(request.prediction_id).get()
         if screening_doc.exists:
             data = screening_doc.to_dict()
-            if auth.role not in ("admin", "reviewer") and data.get("user_id") != auth.user_id:
+            if auth.role != "admin" and data.get("user_id") != auth.user_id:
                 raise HTTPException(status_code=403, detail="Access forbidden to this assessment")
     else:
         query = db.collection("screenings").where("anonymized_id", "==", request.anonymized_id)
-        if auth.role not in ("admin", "reviewer"):
+        if auth.role != "admin":
             query = query.where("user_id", "==", auth.user_id)
         docs = list(query.get())
         if docs:
@@ -338,7 +341,7 @@ async def explain_prediction(
 async def get_statistics(auth: AuthResult = Depends(get_current_user)):
     db = get_firestore_client()
 
-    if auth.role in ("admin", "reviewer"):
+    if auth.role == "admin":
         screenings = list(db.collection("screenings").get())
     else:
         screenings = list(db.collection("screenings").where("user_id", "==", auth.user_id).get())
@@ -370,7 +373,7 @@ async def get_statistics(auth: AuthResult = Depends(get_current_user)):
     median = ordered_scores[midpoint] if total % 2 else (ordered_scores[midpoint - 1] + ordered_scores[midpoint]) / 2
     high = levels[RiskLevel.HIGH.value] + levels[RiskLevel.CRITICAL.value]
 
-    if auth.role in ("admin", "reviewer"):
+    if auth.role == "admin":
         reviews = list(db.collection("reviews").where("status", "==", "pending").get())
     else:
         reviews = list(db.collection("reviews").where("user_id", "==", auth.user_id).where("status", "==", "pending").get())
