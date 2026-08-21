@@ -91,16 +91,23 @@
             <header class="top-header">
                 <div>
                     <h1>Mental Health Risk Analytics</h1>
-                    <p style="color: var(--text-muted); font-size: 0.9rem;">Assessment data science & statistical risk modeling dashboard</p>
+                    <p style="color: var(--text-muted); font-size: 0.85rem; margin-top:2px;">User-Isolated Data Science & Statistical Risk Modeling Dashboard</p>
                 </div>
-                <button id="theme-toggle-btn" onclick="toggleTheme()" class="btn btn-secondary" title="Toggle theme">
-                    <svg id="theme-toggle-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                        <circle cx="12" cy="12" r="5"/>
-                        <line x1="12" y1="1" x2="12" y2="3"/>
-                        <line x1="12" y1="21" x2="12" y2="23"/>
-                    </svg>
-                    <span id="theme-toggle-text">Light Mode</span>
-                </button>
+                <div style="display:flex; align-items:center; gap:12px;">
+                    <div id="user-header-pill" style="display:none; align-items:center; gap:10px; padding:6px 12px; background:var(--bg-card); border:1px solid var(--border-color); border-radius:var(--radius-pill);">
+                        <img id="user-avatar" src="" alt="Avatar" style="width:26px; height:26px; border-radius:50%; display:none; object-fit:cover;">
+                        <span id="header-user-name" style="font-size:0.85rem; font-weight:600;">Guest</span>
+                        <span id="user-role-badge" class="badge badge-low" style="font-size:0.7rem;">User</span>
+                    </div>
+                    <button id="theme-toggle-btn" onclick="toggleTheme()" class="btn btn-secondary" title="Toggle theme">
+                        <svg id="theme-toggle-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <circle cx="12" cy="12" r="5"/>
+                            <line x1="12" y1="1" x2="12" y2="3"/>
+                            <line x1="12" y1="21" x2="12" y2="23"/>
+                        </svg>
+                        <span id="theme-toggle-text">Light Mode</span>
+                    </button>
+                </div>
             </header>
 
             <!-- Metrics Overview Cards -->

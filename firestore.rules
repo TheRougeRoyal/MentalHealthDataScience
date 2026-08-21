@@ -21,39 +21,35 @@ service cloud.firestore {
       // Users can read their own doc; admins can read any
       allow read: if request.auth != null && (request.auth.uid == userId || isAdmin());
 
-      // Users can create their own doc on first login (auto-created by backend)
-      // Admins can update any user doc (e.g. promote to admin)
+      // Users can create their own doc on first login
       allow create: if request.auth != null && request.auth.uid == userId;
-      allow update: if request.auth != null && request.auth.uid == userId || isAdmin();
+      allow update: if request.auth != null && (request.auth.uid == userId || isAdmin());
       allow delete: if false;
     }
 
     // ── Screenings collection ──────────────────────────────────────────
     match /screenings/{screeningId} {
-      // Any authenticated user can read screenings
-      allow read: if request.auth != null;
-      // Any authenticated user can create screenings
-      allow create: if request.auth != null;
-      // No updates or deletes allowed by clients
+      // Users can only read screenings created by themselves (user_id field), admins/reviewers read all
+      allow read: if request.auth != null && (resource.data.user_id == request.auth.uid || isReviewer());
+      // Users can only create screenings stamped with their own uid
+      allow create: if request.auth != null && request.resource.data.user_id == request.auth.uid;
       allow update: if false;
       allow delete: if false;
     }
 
     // ── Explanations collection ────────────────────────────────────────
     match /explanations/{explanationId} {
-      // Any authenticated user can read explanations
-      allow read: if request.auth != null;
-      // Any authenticated user can create explanations (written by backend)
-      allow create: if request.auth != null;
+      // Users can only read explanations belonging to their own screenings, admins/reviewers read all
+      allow read: if request.auth != null && (resource.data.user_id == request.auth.uid || isReviewer());
+      allow create: if request.auth != null && request.resource.data.user_id == request.auth.uid;
       allow update: if false;
       allow delete: if false;
     }
 
     // ── Reviews collection ─────────────────────────────────────────────
     match /reviews/{reviewId} {
-      // Any authenticated user can read reviews
-      allow read: if request.auth != null;
-      // Only admin or reviewer can create/update reviews
+      // Users can read reviews of their own screenings; admins/reviewers can read all
+      allow read: if request.auth != null && (resource.data.user_id == request.auth.uid || isReviewer());
       allow create: if request.auth != null;
       allow update: if isReviewer();
       allow delete: if false;

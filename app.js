@@ -132,7 +132,10 @@ async function firebaseLogout() {
     _fbUser = null;
     document.getElementById('login-form').style.display = '';
     document.getElementById('user-info').style.display = 'none';
-    document.getElementById('user-avatar').style.display = 'none';
+    const avatar = document.getElementById('user-avatar');
+    if (avatar) avatar.style.display = 'none';
+    const headerPill = document.getElementById('user-header-pill');
+    if (headerPill) headerPill.style.display = 'none';
     showSuccess('Signed out');
 }
 
@@ -140,17 +143,25 @@ function showAuthState(user) {
     document.getElementById('login-form').style.display = 'none';
     document.getElementById('user-info').style.display = '';
 
-    // Show avatar if available (Google users have photoURL)
+    const headerPill = document.getElementById('user-header-pill');
+    if (headerPill) headerPill.style.display = 'flex';
+
+    // Show avatar if available
     const avatar = document.getElementById('user-avatar');
-    if (user.photoURL) {
-        avatar.src = user.photoURL;
-        avatar.alt = user.displayName || user.email || '';
-        avatar.style.display = '';
-    } else {
-        avatar.style.display = 'none';
+    if (avatar) {
+        if (user.photoURL) {
+            avatar.src = user.photoURL;
+            avatar.alt = user.displayName || user.email || '';
+            avatar.style.display = '';
+        } else {
+            avatar.style.display = 'none';
+        }
     }
 
-    // Fetch role from backend
+    const displayName = user.displayName || (user.email ? user.email.split('@')[0] : user.uid);
+    const headerName = document.getElementById('header-user-name');
+    if (headerName) headerName.textContent = displayName;
+
     fetchMe();
 }
 
@@ -160,15 +171,22 @@ async function fetchMe() {
         if (r.ok) {
             const u = await r.json();
             const badge = document.getElementById('user-role-badge');
-            badge.textContent = u.role;
-            badge.className = `risk-badge ${u.role === 'admin' ? 'moderate' : 'low'}`;
-            document.getElementById('user-display-name').textContent = u.display_name || u.email || u.uid;
+            if (badge) {
+                badge.textContent = u.role;
+                badge.className = `badge ${u.role === 'admin' ? 'badge-high' : u.role === 'reviewer' ? 'badge-medium' : 'badge-low'}`;
+            }
+            const displayName = u.display_name || u.email || u.uid;
+            const dispEl = document.getElementById('user-display-name');
+            if (dispEl) dispEl.textContent = displayName;
+            const headerName = document.getElementById('header-user-name');
+            if (headerName) headerName.textContent = displayName;
 
-            // Update avatar if backend has a photo_url
             if (u.photo_url) {
                 const avatar = document.getElementById('user-avatar');
-                avatar.src = u.photo_url;
-                avatar.style.display = '';
+                if (avatar) {
+                    avatar.src = u.photo_url;
+                    avatar.style.display = '';
+                }
             }
         }
     } catch (_) {}
