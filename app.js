@@ -93,6 +93,7 @@ let auth = null;
 let db = null;
 let googleProvider = null;
 let _firebaseInitPromise = null;
+let _redirectAfterLogin = false;
 
 let _fbUser = null;
 
@@ -117,6 +118,7 @@ async function authHeaders() {
 
 async function googleSignIn() {
     if (!(await ensureFirebaseReady())) return;
+    _redirectAfterLogin = true;
     try {
         await auth.signInWithPopup(googleProvider);
         // onAuthStateChanged handles the rest
@@ -124,6 +126,7 @@ async function googleSignIn() {
         if (e.code !== 'auth/popup-closed-by-user') {
             showError(`Google sign-in failed: ${e.message}`);
         }
+        _redirectAfterLogin = false;
     }
 }
 
@@ -133,10 +136,12 @@ async function firebaseLogin() {
     const password = document.getElementById('login-password').value.trim();
     if (!email || !password) { showError('Please enter email and password'); return; }
 
+    _redirectAfterLogin = true;
     try {
         await auth.signInWithEmailAndPassword(email, password);
     } catch (e) {
         showError(`Login failed: ${e.message}`);
+        _redirectAfterLogin = false;
     }
 }
 
@@ -147,6 +152,7 @@ async function firebaseRegister() {
     if (!email || !password) { showError('Please enter email and password'); return; }
     if (password.length < 6) { showError('Password must be at least 6 characters'); return; }
 
+    _redirectAfterLogin = true;
     try {
         const cred = await auth.createUserWithEmailAndPassword(email, password);
         // Set display name to the part before @
@@ -154,6 +160,7 @@ async function firebaseRegister() {
         showSuccess('Account created! You are now signed in.');
     } catch (e) {
         showError(`Registration failed: ${e.message}`);
+        _redirectAfterLogin = false;
     }
 }
 
@@ -172,7 +179,7 @@ async function firebaseLogout() {
     showSuccess('Signed out');
 }
 
-function showAuthState(user) {
+async function showAuthState(user) {
     document.getElementById('login-form').style.display = 'none';
     document.getElementById('user-info').style.display = '';
 
@@ -195,7 +202,7 @@ function showAuthState(user) {
     const headerName = document.getElementById('header-user-name');
     if (headerName) headerName.textContent = displayName;
 
-    fetchMe();
+    await fetchMe();
 }
 
 async function fetchMe() {
@@ -302,6 +309,7 @@ async function initializeFirebaseAuthInternal() {
     try {
         if (!firebase.apps.length) firebase.initializeApp(config);
         auth = firebase.auth();
+        await auth.setPersistence(firebase.auth.Auth.Persistence.LOCAL);
         db = firebase.firestore ? firebase.firestore() : null;
         googleProvider = new firebase.auth.GoogleAuthProvider();
         googleProvider.setCustomParameters({ prompt: 'select_account' });
@@ -317,8 +325,12 @@ async function initializeFirebaseAuthInternal() {
             _fbUser = user;
             // Refresh token on auth state change to keep it fresh
             try { await user.getIdToken(true); } catch (_) {}
-            showAuthState(user);
+            await showAuthState(user);
             checkSystemStatus();
+            if (_redirectAfterLogin) {
+                _redirectAfterLogin = false;
+                window.location.href = 'index.html#workspace-options';
+            }
         } else {
             _fbUser = null;
             window._currentRole = 'user';
