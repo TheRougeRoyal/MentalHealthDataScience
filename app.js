@@ -333,20 +333,61 @@ function renderStatistics(data) {
     const target = document.getElementById('statistics-analysis');
     if (!target) return;
 
+    const total = stats.total || 0;
+    const lowCount = distribution.low || 0;
+    const modCount = distribution.moderate || 0;
+    const highCount = (distribution.high || 0) + (distribution.critical || 0);
+
+    const lowPct = total ? ((lowCount / total) * 100).toFixed(1) : 0;
+    const modPct = total ? ((modCount / total) * 100).toFixed(1) : 0;
+    const highPct = total ? ((highCount / total) * 100).toFixed(1) : 0;
+
     target.innerHTML = `
-        <div class="analysis-grid">
-            <div><span class="stat-label">Average score</span><strong>${Number(stats.avg_risk_score || 0).toFixed(1)}</strong></div>
-            <div><span class="stat-label">Median score</span><strong>${Number(stats.median_risk_score || 0).toFixed(1)}</strong></div>
-            <div><span class="stat-label">Score range</span><strong>${Number(stats.min_risk_score || 0).toFixed(1)} - ${Number(stats.max_risk_score || 0).toFixed(1)}</strong></div>
-            <div><span class="stat-label">Risk groups</span><strong>${distribution.low || 0} low / ${distribution.moderate || 0} moderate / ${(distribution.high || 0) + (distribution.critical || 0)} high+</strong></div>
+        <div class="analysis-grid" style="margin-bottom: 20px;">
+            <div>
+                <span class="stat-label">Mean Risk Score</span>
+                <strong>${Number(stats.avg_risk_score || 0).toFixed(1)} <span style="font-size:0.75rem; color:var(--text-muted); font-weight:normal;">/ 100</span></strong>
+            </div>
+            <div>
+                <span class="stat-label">Median (IQR)</span>
+                <strong>${Number(stats.median_risk_score || 0).toFixed(1)} <span style="font-size:0.75rem; color:var(--text-muted); font-weight:normal;">score</span></strong>
+            </div>
+            <div>
+                <span class="stat-label">Min / Max Range</span>
+                <strong>${Number(stats.min_risk_score || 0).toFixed(1)} - ${Number(stats.max_risk_score || 0).toFixed(1)}</strong>
+            </div>
+            <div>
+                <span class="stat-label">Critical / High Prevalence</span>
+                <strong style="color:${highCount > 0 ? 'var(--status-danger)' : 'var(--text-main)'};">${stats.high_risk_count || 0} <span style="font-size:0.75rem; color:var(--text-muted); font-weight:normal;">(${(stats.high_risk_pct || 0).toFixed(1)}%)</span></strong>
+            </div>
         </div>
-        <div style="margin-top: 20px; padding: 16px; background: var(--bg-input); border-radius: var(--radius-input); border-left: 3px solid var(--brand-accent);">
-            <h4 style="margin: 0 0 8px 0; font-size: 0.95rem;">Dataset Information</h4>
-            <p style="margin: 0; font-size: 0.85rem; color: var(--text-muted);">
-                Statistical analysis based on ${stats.total || 0} anonymized screening records. 
-                High-risk cases (${stats.high_risk_count || 0} records, ${(stats.high_risk_pct || 0).toFixed(1)}%) 
-                are flagged for clinical review. Data refreshed from UI pipeline.
-            </p>
+
+        <div style="background: var(--bg-input); border: 1px solid var(--border-color); padding: 18px; border-radius: var(--radius-input);">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+                <h4 style="margin: 0; font-size: 0.875rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.03em; color: var(--text-muted);">Population Risk Stratification</h4>
+                <span style="font-size: 0.8125rem; color: var(--text-muted); font-weight: 500;">N = ${total} records</span>
+            </div>
+            
+            <div style="display: flex; height: 16px; border-radius: var(--radius-pill); overflow: hidden; background: var(--bg-card); border: 1px solid var(--border-color); margin-bottom: 14px;">
+                <div style="width: ${lowPct}%; background: var(--status-success);" title="Low Risk: ${lowCount} (${lowPct}%)"></div>
+                <div style="width: ${modPct}%; background: var(--status-warning);" title="Moderate Risk: ${modCount} (${modPct}%)"></div>
+                <div style="width: ${highPct}%; background: var(--status-danger);" title="High Risk: ${highCount} (${highPct}%)"></div>
+            </div>
+
+            <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; font-size: 0.8125rem;">
+                <div style="display: flex; align-items: center; gap: 8px;">
+                    <span style="width: 10px; height: 10px; border-radius: 50%; background: var(--status-success);"></span>
+                    <span>Low Risk: <strong style="color: var(--text-main);">${lowCount}</strong> (${lowPct}%)</span>
+                </div>
+                <div style="display: flex; align-items: center; gap: 8px;">
+                    <span style="width: 10px; height: 10px; border-radius: 50%; background: var(--status-warning);"></span>
+                    <span>Moderate: <strong style="color: var(--text-main);">${modCount}</strong> (${modPct}%)</span>
+                </div>
+                <div style="display: flex; align-items: center; gap: 8px;">
+                    <span style="width: 10px; height: 10px; border-radius: 50%; background: var(--status-danger);"></span>
+                    <span>High+: <strong style="color: var(--text-main);">${highCount}</strong> (${highPct}%)</span>
+                </div>
+            </div>
         </div>`;
 }
 
