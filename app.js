@@ -178,12 +178,19 @@ async function firebaseLogout() {
     if (avatar) avatar.style.display = 'none';
     const headerPill = document.getElementById('user-header-pill');
     if (headerPill) headerPill.style.display = 'none';
+    // Hide workspace section until user logs in again
+    const workspaceOptions = document.getElementById('workspace-options');
+    if (workspaceOptions) workspaceOptions.style.display = 'none';
     showSuccess('Signed out');
 }
 
 async function showAuthState(user) {
     document.getElementById('login-form').style.display = 'none';
     document.getElementById('user-info').style.display = '';
+
+    // Reveal the workspace navigation section after login
+    const workspaceOptions = document.getElementById('workspace-options');
+    if (workspaceOptions) workspaceOptions.style.display = '';
 
     const headerPill = document.getElementById('user-header-pill');
     if (headerPill) headerPill.style.display = 'flex';
@@ -277,7 +284,7 @@ function applyRoleGating(role) {
 window.addEventListener('DOMContentLoaded', () => {
     guardPageAccess(window._currentRole || 'user');
     checkSystemStatus();
-    initSimulator();
+    if (window._pageScope === 'screening') initSimulator();
     initializeFirebaseAuth();
 });
 
@@ -331,7 +338,7 @@ async function initializeFirebaseAuthInternal() {
             checkSystemStatus();
             if (_redirectAfterLogin) {
                 _redirectAfterLogin = false;
-                window.location.href = 'index.html#workspace-options';
+                redirectToWorkspace();
             }
         } else {
             _fbUser = null;
@@ -341,6 +348,8 @@ async function initializeFirebaseAuthInternal() {
             document.getElementById('user-info').style.display = 'none';
             const avatar = document.getElementById('user-avatar');
             if (avatar) avatar.style.display = 'none';
+            const workspaceOptions = document.getElementById('workspace-options');
+            if (workspaceOptions) workspaceOptions.style.display = 'none';
             guardPageAccess('user');
         }
     });
@@ -352,9 +361,31 @@ function requireSignedIn() {
     return false;
 }
 
+function navigateToWorkspace(dest) {
+    // If not signed in yet, block navigation and prompt sign-in
+    if (!_fbUser) {
+        sessionStorage.setItem('_postLoginDest', dest);
+        showError('Please sign in to access this workspace.');
+        document.getElementById('login-email')?.focus();
+        return false; // prevent <a> default navigation
+    }
+    // Signed in — navigate directly
+    window.location.href = dest;
+    return false;
+}
+
 function redirectToWorkspace() {
-    if (document.body?.dataset?.page !== 'dashboard') return;
-    window.location.href = 'index.html#workspace-options';
+    // ponytail: after login, land on the workspace the user came here to do.
+    // Check if a specific destination was stored before login.
+    const dest = sessionStorage.getItem('_postLoginDest') || 'screening.html';
+    sessionStorage.removeItem('_postLoginDest');
+    window.location.href = dest;
+}
+
+function toggleMobileMenu() {
+    const drawer = document.getElementById('mobile-drawer');
+    if (!drawer) return;
+    drawer.classList.toggle('open');
 }
 
 // ── Status ────────────────────────────────────────────────────────────────

@@ -121,14 +121,14 @@
                 </div>
             </section>
 
-            <section id="workspace-options" class="card" aria-label="Page Navigation">
+            <section id="workspace-options" class="card" aria-label="Page Navigation" style="display:none;">
                 <h2>Open a dedicated workspace</h2>
                 <p style="color: var(--text-muted); margin-bottom: 18px;">Each workflow is intentionally isolated to its own page so users cannot access other records or queue data from a shared dashboard.</p>
                 <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap:16px;">
-                    <a href="screening.html" class="btn btn-primary" style="display:flex; align-items:center; justify-content:center; text-decoration:none;">Screening Tool</a>
-                    <a href="batch.html" class="btn btn-secondary" style="display:flex; align-items:center; justify-content:center; text-decoration:none;">Batch Analytics</a>
-                    <a href="statistics.html" class="btn btn-secondary" style="display:flex; align-items:center; justify-content:center; text-decoration:none;">Statistical Analysis</a>
-                    <a href="queue.html" class="btn btn-secondary" style="display:flex; align-items:center; justify-content:center; text-decoration:none;" data-admin-only>Review Queue</a>
+                    <a href="screening.html" class="btn btn-primary" style="display:flex; align-items:center; justify-content:center; text-decoration:none;" onclick="return navigateToWorkspace('screening.html')">Screening Tool</a>
+                    <a href="batch.html" class="btn btn-secondary" style="display:flex; align-items:center; justify-content:center; text-decoration:none;" onclick="return navigateToWorkspace('batch.html')">Batch Analytics</a>
+                    <a href="statistics.html" class="btn btn-secondary" style="display:flex; align-items:center; justify-content:center; text-decoration:none;" onclick="return navigateToWorkspace('statistics.html')">Statistical Analysis</a>
+                    <a href="queue.html" class="btn btn-secondary" style="display:flex; align-items:center; justify-content:center; text-decoration:none;" data-admin-only onclick="return navigateToWorkspace('queue.html')">Review Queue</a>
                 </div>
             </section>
         </main>
