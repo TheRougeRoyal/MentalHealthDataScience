@@ -12,13 +12,14 @@ applyRoleGating('user');
 
 function guardPageAccess(role = window._currentRole || 'user') {
     const page = document.body?.dataset?.page || 'dashboard';
-    const routePageNames = ['index.html', 'screening.html', 'batch.html', 'statistics.html', 'queue.html'];
+    const routePageNames = ['index.html', 'screening.html', 'batch.html', 'statistics.html', 'queue.html', 'profile.html'];
     const allowedByPage = {
         dashboard: ['user', 'admin'],
         screening: ['user', 'admin'],
         batch: ['user', 'admin'],
         statistics: ['user', 'admin'],
-        queue: ['admin']
+        queue: ['admin'],
+        profile: ['user', 'admin'],
     };
 
     if (window._authReady && !_fbUser) {
@@ -193,7 +194,12 @@ async function showAuthState(user) {
     if (workspaceOptions) workspaceOptions.style.display = '';
 
     const headerPill = document.getElementById('user-header-pill');
-    if (headerPill) headerPill.style.display = 'flex';
+    if (headerPill) {
+        headerPill.style.display = 'flex';
+        headerPill.style.cursor = 'pointer';
+        headerPill.title = 'View profile';
+        headerPill.onclick = () => navigateToWorkspace('profile.html');
+    }
 
     // Show avatar if available
     const avatar = document.getElementById('user-avatar');
@@ -212,6 +218,8 @@ async function showAuthState(user) {
     if (headerName) headerName.textContent = displayName;
 
     await fetchMe();
+
+    if (window._pageScope === 'profile') loadProfilePage();
 }
 
 async function fetchMe() {
@@ -286,6 +294,7 @@ window.addEventListener('DOMContentLoaded', () => {
     checkSystemStatus();
     if (window._pageScope === 'dashboard') initDashboardNavigation();
     if (window._pageScope === 'screening') initSimulator();
+    if (window._pageScope === 'profile') initProfile();
     initializeFirebaseAuth();
 });
 
@@ -1326,6 +1335,219 @@ function renderTrend(container, anonymizedId) {
             <polyline class="trend-line" points="${pts}" stroke="${levelColor(history[history.length - 1].level)}"/>
             ${history.map((h, i) => `<circle class="trend-dot" cx="${x(i)}" cy="${y(h.score)}" r="3.5" fill="${levelColor(h.level)}"/>`).join('')}
         </svg>`;
+}
+
+// ── Profile ───────────────────────────────────────────────────────────────
+
+function initProfile() {
+    if (!_fbUser) return;
+    loadProfilePage();
+}
+
+async function loadProfilePage() {
+    const content = document.getElementById('profile-content');
+    const loading = document.getElementById('loading');
+    if (!content) return;
+
+    if (!_fbUser) {
+        content.style.display = 'none';
+        return;
+    }
+
+    if (loading) loading.style.display = 'block';
+    content.style.display = 'none';
+
+    try {
+        const [profileRes, statsRes] = await Promise.all([
+            fetch(`${API_BASE_URL}/auth/me`, { headers: await authHeaders() }),
+            fetch(`${API_BASE_URL}/statistics`, { headers: await authHeaders() }),
+        ]);
+
+        if (!profileRes.ok) {
+            showProfileError('Failed to load profile.');
+            return;
+        }
+
+        const profile = await profileRes.json();
+        populateProfileForm(profile);
+
+        if (statsRes.ok) {
+            const stats = await statsRes.json();
+            const screeningsEl = document.getElementById('profile-stat-screenings');
+            const highRiskEl = document.getElementById('profile-stat-highrisk');
+            if (screeningsEl) screeningsEl.textContent = stats.screenings?.total ?? 0;
+            if (highRiskEl) highRiskEl.textContent = stats.screenings?.high_risk_count ?? 0;
+        }
+
+        const passwordSection = document.getElementById('password-section');
+        if (passwordSection) {
+            passwordSection.style.display = profile.provider === 'email' ? '' : 'none';
+        }
+
+        content.style.display = '';
+        const authSection = document.getElementById('auth-section');
+        if (authSection) authSection.style.display = 'none';
+    } catch (_) {
+        showProfileError('Failed to load profile.');
+    } finally {
+        if (loading) loading.style.display = 'none';
+    }
+}
+
+function populateProfileForm(profile) {
+    const displayName = profile.display_name || profile.email || profile.uid;
+    const setText = (id, text) => { const el = document.getElementById(id); if (el) el.textContent = text; };
+    const setVal = (id, val) => { const el = document.getElementById(id); if (el) el.value = val || ''; };
+
+    setText('profile-display-name', displayName);
+    setText('profile-email', profile.email || '—');
+    setVal('profile-display-name-input', profile.display_name);
+    setVal('profile-job-title', profile.job_title);
+    setVal('profile-organization', profile.organization);
+    setVal('profile-location', profile.location);
+    setVal('profile-phone', profile.phone);
+    setVal('profile-website', profile.website);
+    setVal('profile-bio', profile.bio);
+
+    const roleBadge = document.getElementById('profile-role-badge');
+    if (roleBadge) {
+        roleBadge.textContent = profile.role || 'user';
+        roleBadge.className = `badge ${profile.role === 'admin' ? 'badge-high' : 'badge-low'}`;
+    }
+
+    const providerBadge = document.getElementById('profile-provider-badge');
+    if (providerBadge) {
+        const labels = { google: 'Google', email: 'Email', dev: 'Dev' };
+        providerBadge.textContent = labels[profile.provider] || profile.provider || 'Unknown';
+    }
+
+    const avatar = document.getElementById('profile-avatar');
+    const fallback = document.getElementById('profile-avatar-fallback');
+    if (profile.photo_url && avatar) {
+        avatar.src = profile.photo_url;
+        avatar.style.display = '';
+        if (fallback) fallback.style.display = 'none';
+    } else {
+        if (avatar) avatar.style.display = 'none';
+        if (fallback) fallback.style.display = 'flex';
+    }
+}
+
+async function saveProfile() {
+    if (!requireSignedIn()) return;
+    hideProfileError();
+
+    const bio = document.getElementById('profile-bio')?.value?.trim() || null;
+    if (bio && bio.length > 500) {
+        showProfileError('Bio must be 500 characters or fewer.');
+        return;
+    }
+
+    const payload = {
+        display_name: document.getElementById('profile-display-name-input')?.value?.trim() || null,
+        job_title: document.getElementById('profile-job-title')?.value?.trim() || null,
+        organization: document.getElementById('profile-organization')?.value?.trim() || null,
+        location: document.getElementById('profile-location')?.value?.trim() || null,
+        phone: document.getElementById('profile-phone')?.value?.trim() || null,
+        website: document.getElementById('profile-website')?.value?.trim() || null,
+        bio,
+    };
+
+    try {
+        const r = await fetch(`${API_BASE_URL}/auth/me`, {
+            method: 'PATCH',
+            headers: await authHeaders(),
+            body: JSON.stringify(payload),
+        });
+        if (!r.ok) {
+            const err = await r.json().catch(() => ({}));
+            showProfileError(err.detail || 'Failed to save profile.');
+            return;
+        }
+
+        const updated = await r.json();
+        populateProfileForm(updated);
+
+        if (_fbUser && payload.display_name) {
+            try { await _fbUser.updateProfile({ displayName: payload.display_name }); } catch (_) {}
+        }
+
+        await fetchMe();
+        showProfileSuccess('Profile saved successfully.');
+    } catch (_) {
+        showProfileError('Failed to save profile.');
+    }
+}
+
+async function changePassword() {
+    if (!requireSignedIn()) return;
+    hidePasswordError();
+
+    const current = document.getElementById('current-password')?.value || '';
+    const newPass = document.getElementById('new-password')?.value || '';
+    const confirm = document.getElementById('confirm-password')?.value || '';
+
+    if (!current || !newPass || !confirm) {
+        showPasswordError('Please fill in all password fields.');
+        return;
+    }
+    if (newPass.length < 6) {
+        showPasswordError('New password must be at least 6 characters.');
+        return;
+    }
+    if (newPass !== confirm) {
+        showPasswordError('New passwords do not match.');
+        return;
+    }
+
+    if (!(await ensureFirebaseReady())) return;
+
+    try {
+        const cred = firebase.auth.EmailAuthProvider.credential(_fbUser.email, current);
+        await _fbUser.reauthenticateWithCredential(cred);
+        await _fbUser.updatePassword(newPass);
+        document.getElementById('current-password').value = '';
+        document.getElementById('new-password').value = '';
+        document.getElementById('confirm-password').value = '';
+        showProfileSuccess('Password updated successfully.');
+    } catch (e) {
+        showPasswordError(e.code === 'auth/wrong-password' ? 'Current password is incorrect.' : `Password update failed: ${e.message}`);
+    }
+}
+
+function showProfileError(msg) {
+    const e = document.getElementById('profile-form-error');
+    if (!e) { showError(msg); return; }
+    e.textContent = msg;
+    e.style.display = 'block';
+    e.className = 'error-message';
+}
+
+function showProfileSuccess(msg) {
+    const e = document.getElementById('profile-form-error');
+    if (!e) { showSuccess(msg); return; }
+    e.textContent = msg;
+    e.style.display = 'block';
+    e.className = 'success-message';
+    setTimeout(() => { e.style.display = 'none'; }, 3000);
+}
+
+function hideProfileError() {
+    const e = document.getElementById('profile-form-error');
+    if (e) e.style.display = 'none';
+}
+
+function showPasswordError(msg) {
+    const e = document.getElementById('password-form-error');
+    if (!e) return;
+    e.textContent = msg;
+    e.style.display = 'block';
+    e.className = 'error-message';
+}
+
+function hidePasswordError() {
+    const e = document.getElementById('password-form-error');
+    if (e) e.style.display = 'none';
 }
 
 // ── Utilities ─────────────────────────────────────────────────────────────

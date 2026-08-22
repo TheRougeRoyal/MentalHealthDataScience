@@ -44,6 +44,40 @@ class UserInfo(BaseModel):
     display_name: str | None = None
     photo_url: str | None = None
     provider: str | None = None
+    bio: str | None = None
+    organization: str | None = None
+    job_title: str | None = None
+    phone: str | None = None
+    location: str | None = None
+    website: str | None = None
+
+
+class UpdateProfileRequest(BaseModel):
+    display_name: str | None = None
+    bio: str | None = None
+    organization: str | None = None
+    job_title: str | None = None
+    phone: str | None = None
+    location: str | None = None
+    website: str | None = None
+
+
+def _user_info_from_doc(uid: str, auth: AuthResult, user_data: dict | None) -> UserInfo:
+    data = user_data or {}
+    return UserInfo(
+        uid=uid,
+        email=auth.email,
+        role=auth.role or "user",
+        display_name=data.get("display_name", auth.display_name),
+        photo_url=data.get("photo_url", auth.photo_url),
+        provider=data.get("provider", auth.provider),
+        bio=data.get("bio"),
+        organization=data.get("organization"),
+        job_title=data.get("job_title"),
+        phone=data.get("phone"),
+        location=data.get("location"),
+        website=data.get("website"),
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -201,12 +235,62 @@ async def firebase_config():
 
 @router.get("/me")
 async def me(auth: AuthResult = Depends(get_current_user)):
-    """Return the identity of the currently authenticated user."""
-    return UserInfo(
-        uid=auth.user_id or "",
-        email=auth.email,
-        role=auth.role or "user",
-        display_name=auth.display_name,
-        photo_url=auth.photo_url,
-        provider=auth.provider,
-    )
+    """Return the identity and profile of the currently authenticated user."""
+    uid = auth.user_id or ""
+    user_data: dict | None = None
+    try:
+        db = get_firestore_client()
+        if db is not None:
+            doc = db.collection("users").document(uid).get()
+            if doc.exists:
+                user_data = doc.to_dict()
+    except Exception as e:
+        logger.error("Failed to fetch user profile: %s", e)
+    return _user_info_from_doc(uid, auth, user_data)
+
+
+@router.patch("/me")
+async def update_me(
+    body: UpdateProfileRequest,
+    auth: AuthResult = Depends(get_current_user),
+):
+    """Update the current user's profile fields in Firestore."""
+    uid = auth.user_id or ""
+    if not uid:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Not authenticated")
+
+    updates: dict = {}
+    for field in ("display_name", "bio", "organization", "job_title", "phone", "location", "website"):
+        value = getattr(body, field)
+        if value is not None:
+            cleaned = value.strip() if isinstance(value, str) else value
+            if field == "bio" and cleaned and len(cleaned) > 500:
+                raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Bio must be 500 characters or fewer")
+            updates[field] = cleaned or None
+
+    if not updates:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="No profile fields to update")
+
+    updates["updated_at"] = _fs.SERVER_TIMESTAMP
+
+    try:
+        db = get_firestore_client()
+        if db is None:
+            raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail="Profile storage unavailable")
+        db.collection("users").document(uid).set(updates, merge=True)
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error("Failed to update user profile: %s", e)
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Failed to update profile")
+
+    if "display_name" in updates and updates["display_name"]:
+        try:
+            from firebase_admin import auth as firebase_auth
+            firebase_auth.update_user(uid, display_name=updates["display_name"])
+        except Exception as e:
+            logger.warning("Firebase Auth display_name sync failed: %s", e)
+
+    doc = db.collection("users").document(uid).get()
+    user_data = doc.to_dict() if doc.exists else updates
+    return _user_info_from_doc(uid, auth, user_data)
