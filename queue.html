@@ -6,12 +6,12 @@
     <title>Mental Health Data Science | Review Queue</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="styles.css">
 </head>
 <body class="dark" data-page="queue">
     <div class="mobile-nav-bar">
-        <div class="mobile-brand">MindMetrics AI</div>
+        <div class="mobile-brand">MindMetrics</div>
         <button class="mobile-menu-btn" onclick="toggleMobileMenu()">Menu</button>
     </div>
     <div id="mobile-drawer" class="mobile-drawer">
@@ -26,12 +26,12 @@
 
     <div class="app-wrapper" id="app-wrapper">
         <aside class="app-sidebar">
-            <div class="sidebar-brand" style="display:flex; justify-content:space-between; align-items:center; width:100%;">
-                <div style="display:flex; align-items:center; gap:10px;">
-                    <div class="brand-icon" style="width:32px; height:32px; border-radius:6px; background:var(--bg-input); border:1px solid var(--border-color); display:flex; align-items:center; justify-content:center;">🧠</div>
-                    <div>
-                        <div class="brand-title" style="font-size:0.95rem; font-weight:600; letter-spacing:-0.01em;">MindMetrics AI</div>
-                        <div class="brand-subtitle" style="font-size:0.75rem; color:var(--text-muted);">Risk Data Science</div>
+            <div class="sidebar-brand">
+                <div class="sidebar-brand-inner">
+                    <div class="brand-mark" aria-hidden="true">M</div>
+                    <div class="brand-text">
+                        <div class="brand-title">MindMetrics</div>
+                        <div class="brand-subtitle">Risk Data Science</div>
                     </div>
                 </div>
             </div>
@@ -49,15 +49,18 @@
             <header class="top-header">
                 <div>
                     <h1>Review Queue</h1>
-                    <p style="color: var(--text-muted); font-size: 0.85rem; margin-top:2px;">Admin-only patient review workflow</p>
+                    <p class="page-lead">Admin-only patient review workflow</p>
                 </div>
-                <div style="display:flex; align-items:center; gap:12px;">
-                    <div id="user-header-pill" style="display:none; align-items:center; gap:10px; padding:6px 12px; background:var(--bg-card); border:1px solid var(--border-color); border-radius:var(--radius-pill);">
-                        <img id="user-avatar" src="" alt="Avatar" style="width:26px; height:26px; border-radius:50%; display:none; object-fit:cover;">
-                        <span id="header-user-name" style="font-size:0.85rem; font-weight:600;">Guest</span>
-                        <span id="user-role-badge" class="badge badge-low" style="font-size:0.7rem;">User</span>
+                <div class="header-toolbar">
+                    <div id="user-header-pill" class="user-header-pill">
+                        <img id="user-avatar" src="" alt="Avatar" style="display:none;">
+                        <span id="header-user-name" class="header-user-name">Guest</span>
+                        <span id="user-role-badge" class="badge badge-low">User</span>
                     </div>
-                    <button id="theme-toggle-btn" onclick="toggleTheme()" class="btn btn-secondary" title="Toggle theme">Toggle Theme</button>
+                    <button id="theme-toggle-btn" onclick="toggleTheme()" class="btn btn-secondary btn-theme" title="Toggle theme">
+                        <svg class="theme-icon" id="theme-toggle-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"></svg>
+                        <span id="theme-toggle-text">Light mode</span>
+                    </button>
                 </div>
             </header>
 
@@ -65,7 +68,7 @@
                 <h2>Researcher & Practitioner Login</h2>
                 <div id="error-display" class="error-message" role="alert" style="display:none;"></div>
                 <div id="login-form">
-                    <button onclick="googleSignIn()" class="google-btn" type="button">Sign in with Google Provider</button>
+                    <button onclick="googleSignIn()" class="google-btn" type="button">Continue with Google</button>
                     <div class="or-divider">or email login</div>
                     <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 16px;">
                         <div class="form-group">
@@ -79,7 +82,7 @@
                     </div>
                     <div style="display:flex;gap:10px;margin-top:8px;">
                         <button onclick="firebaseLogin()" class="btn btn-primary">Sign In</button>
-                        <button onclick="firebaseRegister()" class="btn btn-secondary">Register Account</button>
+                        <button onclick="firebaseRegister()" class="btn btn-secondary">Create account</button>
                     </div>
                 </div>
                 <div id="user-info" style="display:none;">

@@ -69,10 +69,10 @@ function updateThemeToggleUI(theme) {
     if (!btnText || !btnIcon) return;
     
     if (theme === 'light') {
-        btnText.textContent = 'Dark Mode';
+        btnText.textContent = 'Dark mode';
         btnIcon.innerHTML = `<path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path>`;
     } else {
-        btnText.textContent = 'Light Mode';
+        btnText.textContent = 'Light mode';
         btnIcon.innerHTML = `<circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/>`;
     }
 }
@@ -813,7 +813,7 @@ function displayBatchResults(data) {
             </div>
             <div style="display:flex; gap:8px;">`;
         if (r.alert_triggered) html += `<span class="badge badge-high">🚨 Alert</span>`;
-        if (r.requires_human_review) html += `<span class="badge badge-medium">👤 Review</span>`;
+        if (r.requires_human_review) html += `<span class="badge badge-medium">Review</span>`;
         html += `</div></div>`;
     });
     el.innerHTML = html + '</div>';
@@ -924,8 +924,8 @@ function displayResults(data) {
 
     const alerts = document.getElementById('alerts-display');
     alerts.innerHTML = '';
-    if (data.alert_triggered) alerts.innerHTML = '<div class="alert-box danger"><span>⚠️</span><strong>Alert:</strong> Immediate attention recommended</div>';
-    if (data.requires_human_review) alerts.innerHTML += '<div class="alert-box warning"><span>👤</span><strong>Human Review Required</strong></div>';
+    if (data.alert_triggered) alerts.innerHTML = '<div class="alert-box danger"><strong>Alert:</strong> Immediate attention recommended</div>';
+    if (data.requires_human_review) alerts.innerHTML += '<div class="alert-box warning"><strong>Human review required</strong></div>';
 
     const factors = document.getElementById('factors-list');
     factors.innerHTML = '';
@@ -1423,6 +1423,14 @@ function populateProfileForm(profile) {
 
     const avatar = document.getElementById('profile-avatar');
     const fallback = document.getElementById('profile-avatar-fallback');
+    const initials = String(displayName || '?')
+        .split(/\s+/)
+        .filter(Boolean)
+        .map((part) => part[0])
+        .join('')
+        .slice(0, 2)
+        .toUpperCase();
+    if (fallback) fallback.textContent = initials || '?';
     if (profile.photo_url && avatar) {
         avatar.src = profile.photo_url;
         avatar.style.display = '';
