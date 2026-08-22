@@ -284,6 +284,7 @@ function applyRoleGating(role) {
 window.addEventListener('DOMContentLoaded', () => {
     guardPageAccess(window._currentRole || 'user');
     checkSystemStatus();
+    if (window._pageScope === 'dashboard') initDashboardNavigation();
     if (window._pageScope === 'screening') initSimulator();
     initializeFirebaseAuth();
 });
@@ -386,6 +387,48 @@ function toggleMobileMenu() {
     const drawer = document.getElementById('mobile-drawer');
     if (!drawer) return;
     drawer.classList.toggle('open');
+}
+
+function initDashboardNavigation() {
+    const links = [...document.querySelectorAll('.sidebar-nav a[href^="#"], .mobile-drawer a[href^="#"]')];
+    const sections = links
+        .map(link => document.querySelector(link.getAttribute('href')))
+        .filter((section, index, all) => section && all.indexOf(section) === index);
+
+    const setActiveLink = (sectionId) => {
+        links.forEach(link => {
+            link.classList.toggle('active', link.getAttribute('href') === `#${sectionId}`);
+        });
+    };
+
+    links.forEach(link => {
+        link.addEventListener('click', (event) => {
+            const targetId = link.getAttribute('href')?.slice(1);
+            const target = targetId ? document.getElementById(targetId) : null;
+            if (!target) return;
+
+            if (link.hasAttribute('data-admin-only') && window._currentRole !== 'admin') {
+                event.preventDefault();
+                showError('The review queue is available to administrators only.');
+                return;
+            }
+
+            event.preventDefault();
+            target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            setActiveLink(targetId);
+            document.getElementById('mobile-drawer')?.classList.remove('open');
+        });
+    });
+
+    if ('IntersectionObserver' in window && sections.length) {
+        const observer = new IntersectionObserver((entries) => {
+            const visible = entries
+                .filter(entry => entry.isIntersecting)
+                .sort((a, b) => b.intersectionRatio - a.intersectionRatio)[0];
+            if (visible) setActiveLink(visible.target.id);
+        }, { rootMargin: '-18% 0px -65% 0px', threshold: [0, 0.25, 0.5, 1] });
+        sections.forEach(section => observer.observe(section));
+    }
 }
 
 // ── Status ────────────────────────────────────────────────────────────────
