@@ -22,7 +22,7 @@ from src.api.metrics import (
     SCREENINGS_TOTAL, SCREENING_SCORE, ALERTS_TRIGGERED,
     REVIEWS_CREATED, BATCH_SIZE, BATCH_ITEMS,
 )
-from src.firebase_admin import get_firestore_client
+from src.firebase_admin import get_firestore_client, persistence_enabled
 from src.risk_model import get_risk_model
 
 logger = logging.getLogger(__name__)
@@ -80,41 +80,44 @@ async def screen_individual(
     db = get_firestore_client()
     screening_id = str(uuid.uuid4())
 
-    db.collection("screenings").document(screening_id).set({
-        "id": screening_id,
-        "user_id": auth.user_id,
-        "anonymized_id": request.anonymized_id,
-        "risk_score": assessment.risk_score,
-        "risk_level": assessment.risk_level,
-        "input_data": combined,
-        "created_at": firestore.SERVER_TIMESTAMP,
-    })
+    if db is not None:
+        db.collection("screenings").document(screening_id).set({
+            "id": screening_id,
+            "user_id": auth.user_id,
+            "anonymized_id": request.anonymized_id,
+            "risk_score": assessment.risk_score,
+            "risk_level": assessment.risk_level,
+            "input_data": combined,
+            "created_at": firestore.SERVER_TIMESTAMP,
+        })
 
-    db.collection("explanations").document(screening_id).set({
-        "id": screening_id,
-        "screening_id": screening_id,
-        "user_id": auth.user_id,
-        "explanation_text": assessment.clinical_interpretation,
-        "factors": {
-            "contributing_factors": assessment.contributing_factors,
-            "confidence": assessment.confidence,
-            "top_features": [{"name": n, "value": v} for n, v in assessment.top_features],
-            "counterfactual": assessment.counterfactual,
-        },
-        "created_at": firestore.SERVER_TIMESTAMP,
-    })
-
-    if assessment.requires_human_review:
-        db.collection("reviews").document(screening_id).set({
+        db.collection("explanations").document(screening_id).set({
             "id": screening_id,
             "screening_id": screening_id,
             "user_id": auth.user_id,
-            "status": "pending",
-            "reviewer_uid": None,
-            "notes": None,
+            "explanation_text": assessment.clinical_interpretation,
+            "factors": {
+                "contributing_factors": assessment.contributing_factors,
+                "confidence": assessment.confidence,
+                "top_features": [{"name": n, "value": v} for n, v in assessment.top_features],
+                "counterfactual": assessment.counterfactual,
+            },
             "created_at": firestore.SERVER_TIMESTAMP,
-            "updated_at": firestore.SERVER_TIMESTAMP,
         })
+
+        if assessment.requires_human_review:
+            db.collection("reviews").document(screening_id).set({
+                "id": screening_id,
+                "screening_id": screening_id,
+                "user_id": auth.user_id,
+                "status": "pending",
+                "reviewer_uid": None,
+                "notes": None,
+                "created_at": firestore.SERVER_TIMESTAMP,
+                "updated_at": firestore.SERVER_TIMESTAMP,
+            })
+    else:
+        logger.debug("Persistence disabled — skipping Firestore writes for screening %s", screening_id)
 
     risk_score = RiskScore(
         anonymized_id=request.anonymized_id,
@@ -177,41 +180,44 @@ async def batch_screen(
             a = model.assess(combined)
             screening_id = str(uuid.uuid4())
 
-            db.collection("screenings").document(screening_id).set({
-                "id": screening_id,
-                "anonymized_id": req.anonymized_id,
-                "user_id": auth.user_id,
-                "risk_score": a.risk_score,
-                "risk_level": a.risk_level,
-                "input_data": combined,
-                "created_at": firestore.SERVER_TIMESTAMP,
-            })
+            if db is not None:
+                db.collection("screenings").document(screening_id).set({
+                    "id": screening_id,
+                    "anonymized_id": req.anonymized_id,
+                    "user_id": auth.user_id,
+                    "risk_score": a.risk_score,
+                    "risk_level": a.risk_level,
+                    "input_data": combined,
+                    "created_at": firestore.SERVER_TIMESTAMP,
+                })
 
-            db.collection("explanations").document(screening_id).set({
-                "id": screening_id,
-                "screening_id": screening_id,
-                "user_id": auth.user_id,
-                "explanation_text": a.clinical_interpretation,
-                "factors": {
-                    "contributing_factors": a.contributing_factors,
-                    "confidence": a.confidence,
-                    "top_features": [{"name": n, "value": v} for n, v in a.top_features],
-                    "counterfactual": a.counterfactual,
-                },
-                "created_at": firestore.SERVER_TIMESTAMP,
-            })
-
-            if a.requires_human_review:
-                db.collection("reviews").document(screening_id).set({
+                db.collection("explanations").document(screening_id).set({
                     "id": screening_id,
                     "screening_id": screening_id,
                     "user_id": auth.user_id,
-                    "status": "pending",
-                    "reviewer_uid": None,
-                    "notes": None,
+                    "explanation_text": a.clinical_interpretation,
+                    "factors": {
+                        "contributing_factors": a.contributing_factors,
+                        "confidence": a.confidence,
+                        "top_features": [{"name": n, "value": v} for n, v in a.top_features],
+                        "counterfactual": a.counterfactual,
+                    },
                     "created_at": firestore.SERVER_TIMESTAMP,
-                    "updated_at": firestore.SERVER_TIMESTAMP,
                 })
+
+                if a.requires_human_review:
+                    db.collection("reviews").document(screening_id).set({
+                        "id": screening_id,
+                        "screening_id": screening_id,
+                        "user_id": auth.user_id,
+                        "status": "pending",
+                        "reviewer_uid": None,
+                        "notes": None,
+                        "created_at": firestore.SERVER_TIMESTAMP,
+                        "updated_at": firestore.SERVER_TIMESTAMP,
+                    })
+            else:
+                logger.debug("Persistence disabled — skipping Firestore writes for batch item %s", screening_id)
 
             results.append(ScreeningResponse(
                 risk_score=RiskScore(
@@ -340,6 +346,19 @@ async def explain_prediction(
 @router.get("/statistics")
 async def get_statistics(auth: AuthResult = Depends(get_current_user)):
     db = get_firestore_client()
+
+    if db is None:
+        logger.debug("Persistence disabled — returning empty statistics")
+        return {
+            "timestamp": time.time(),
+            "screenings": {
+                "total": 0, "avg_risk_score": 0, "median_risk_score": 0,
+                "min_risk_score": 0, "max_risk_score": 0,
+                "high_risk_count": 0, "high_risk_pct": 0,
+            },
+            "risk_distribution": {level.value: 0 for level in RiskLevel},
+            "review_queue": {"pending_count": 0},
+        }
 
     if auth.role == "admin":
         screenings = list(db.collection("screenings").get())
