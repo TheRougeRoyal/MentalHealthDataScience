@@ -689,7 +689,10 @@ async function submitScreening() {
     showLoading(true); hideError(); hideResults();
     try {
         const r = await fetch(`${API_BASE_URL}/screen`, { method: 'POST', headers: await authHeaders(), body: JSON.stringify(payload) });
-        if (!r.ok) { const e = await r.json(); throw new Error(e.detail || `HTTP ${r.status}`); }
+        if (!r.ok) {
+            const e = await r.json().catch(() => ({}));
+            throw new Error(e.detail || e.message || `HTTP ${r.status}`);
+        }
         displayResults(await r.json());
     } catch (e) {
         showError(`Assessment failed: ${e.message}`);
@@ -729,7 +732,7 @@ async function submitBatchScreening() {
         });
         if (!r.ok) {
             let msg = `HTTP ${r.status}`;
-            try { const e = await r.json(); msg = e.detail || JSON.stringify(e); } catch (_) {}
+            try { const e = await r.json(); msg = e.detail || e.message || JSON.stringify(e); } catch (_) {}
             throw new Error(msg);
         }
         displayBatchResults(await r.json());

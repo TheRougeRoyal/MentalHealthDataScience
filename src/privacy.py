@@ -10,6 +10,9 @@ from typing import Any, Dict
 
 from cryptography.fernet import Fernet
 from firebase_admin import firestore
+from dotenv import load_dotenv
+
+load_dotenv()
 
 logger = logging.getLogger(__name__)
 
