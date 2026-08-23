@@ -3,7 +3,7 @@
 from datetime import datetime
 from enum import Enum
 from typing import Dict, List, Optional, Tuple
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 
 class RiskLevel(str, Enum):
@@ -12,6 +12,7 @@ class RiskLevel(str, Enum):
     MODERATE = "moderate"
     HIGH = "high"
     CRITICAL = "critical"
+    INSUFFICIENT_DATA = "insufficient_data"
 
 
 class ScreeningRequest(BaseModel):
@@ -52,8 +53,7 @@ class ScreeningRequest(BaseModel):
         return v.strip()
 
 
-    class Config:
-        json_schema_extra = {
+    model_config = ConfigDict(json_schema_extra={
             "example": {
                 "anonymized_id": "a1b2c3d4e5f6",
                 "survey_data": {
@@ -71,7 +71,7 @@ class ScreeningRequest(BaseModel):
                 "consent_verified": True,
                 "timestamp": "2025-11-17T10:30:00Z"
             }
-        }
+        })
 
 
 class RiskScore(BaseModel):
@@ -104,9 +104,10 @@ class RiskScore(BaseModel):
         default_factory=datetime.utcnow,
         description="Prediction timestamp"
     )
+    model_version: str = Field(default="unknown", description="Version of the risk model")
+    confidence_method: str = Field(default="unknown", description="How confidence was produced")
 
-    class Config:
-        json_schema_extra = {
+    model_config = ConfigDict(json_schema_extra={
             "example": {
                 "anonymized_id": "a1b2c3d4e5f6",
                 "score": 68.5,
@@ -119,7 +120,7 @@ class RiskScore(BaseModel):
                 ],
                 "timestamp": "2025-11-17T10:30:05Z"
             }
-        }
+        })
 
 
 class ExplanationSummary(BaseModel):
@@ -141,8 +142,7 @@ class ExplanationSummary(BaseModel):
         description="Clinical interpretation of the prediction"
     )
 
-    class Config:
-        json_schema_extra = {
+    model_config = ConfigDict(json_schema_extra={
             "example": {
                 "top_features": [
                     ("phq9_score", 0.25),
@@ -153,7 +153,7 @@ class ExplanationSummary(BaseModel):
                 "rule_approximation": "IF phq9_score > 15 AND sleep_hours < 6 THEN risk = high",
                 "clinical_interpretation": "The elevated risk is primarily driven by depressive symptoms and sleep disturbance."
             }
-        }
+        })
 
 
 class ResourceRecommendation(BaseModel):
@@ -183,8 +183,7 @@ class ResourceRecommendation(BaseModel):
         description="Eligibility criteria for the resource"
     )
 
-    class Config:
-        json_schema_extra = {
+    model_config = ConfigDict(json_schema_extra={
             "example": {
                 "resource_type": "crisis_line",
                 "name": "National Suicide Prevention Lifeline",
@@ -193,7 +192,7 @@ class ResourceRecommendation(BaseModel):
                 "urgency": "immediate",
                 "eligibility_criteria": ["Available to all"]
             }
-        }
+        })
 
 
 class ScreeningResponse(BaseModel):
@@ -219,8 +218,7 @@ class ScreeningResponse(BaseModel):
         description="Whether an alert was triggered"
     )
 
-    class Config:
-        json_schema_extra = {
+    model_config = ConfigDict(json_schema_extra={
             "example": {
                 "risk_score": {
                     "anonymized_id": "a1b2c3d4e5f6",
@@ -249,7 +247,7 @@ class ScreeningResponse(BaseModel):
                 "requires_human_review": True,
                 "alert_triggered": False
             }
-        }
+        })
 
 
 class RiskScoreResponse(BaseModel):
@@ -273,8 +271,7 @@ class RiskScoreResponse(BaseModel):
         description="Whether the risk score was found"
     )
 
-    class Config:
-        json_schema_extra = {
+    model_config = ConfigDict(json_schema_extra={
             "example": {
                 "risk_score": {
                     "anonymized_id": "a1b2c3d4e5f6",
@@ -286,7 +283,7 @@ class RiskScoreResponse(BaseModel):
                 },
                 "found": True
             }
-        }
+        })
 
 
 class ExplanationRequest(BaseModel):
@@ -302,13 +299,12 @@ class ExplanationRequest(BaseModel):
         description="Specific prediction ID to explain"
     )
 
-    class Config:
-        json_schema_extra = {
+    model_config = ConfigDict(json_schema_extra={
             "example": {
                 "anonymized_id": "a1b2c3d4e5f6",
                 "prediction_id": "pred_123456"
             }
-        }
+        })
 
 
 class ExplanationResponse(BaseModel):
@@ -326,8 +322,7 @@ class ExplanationResponse(BaseModel):
         description="Associated risk score"
     )
 
-    class Config:
-        json_schema_extra = {
+    model_config = ConfigDict(json_schema_extra={
             "example": {
                 "anonymized_id": "a1b2c3d4e5f6",
                 "explanations": {
@@ -345,7 +340,7 @@ class ExplanationResponse(BaseModel):
                     "timestamp": "2025-11-17T10:30:05Z"
                 }
             }
-        }
+        })
 
 
 class ErrorResponse(BaseModel):
@@ -367,8 +362,7 @@ class ErrorResponse(BaseModel):
         description="Error timestamp"
     )
 
-    class Config:
-        json_schema_extra = {
+    model_config = ConfigDict(json_schema_extra={
             "example": {
                 "error": "ValidationError",
                 "message": "Invalid request data",
@@ -378,7 +372,7 @@ class ErrorResponse(BaseModel):
                 },
                 "timestamp": "2025-11-17T10:30:00Z"
             }
-        }
+        })
 
 
 class BatchScreeningRequest(BaseModel):
@@ -390,8 +384,7 @@ class BatchScreeningRequest(BaseModel):
         description="List of screening requests (max 100)"
     )
 
-    class Config:
-        json_schema_extra = {
+    model_config = ConfigDict(json_schema_extra={
             "example": {
                 "requests": [
                     {
@@ -406,7 +399,7 @@ class BatchScreeningRequest(BaseModel):
                     }
                 ]
             }
-        }
+        })
 
 
 class BatchScreeningResponse(BaseModel):
@@ -428,12 +421,11 @@ class BatchScreeningResponse(BaseModel):
         description="Number of failed screenings"
     )
 
-    class Config:
-        json_schema_extra = {
+    model_config = ConfigDict(json_schema_extra={
             "example": {
                 "results": [],
                 "total": 2,
                 "successful": 1,
                 "failed": 1
             }
-        }
+        })

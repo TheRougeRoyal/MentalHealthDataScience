@@ -40,11 +40,20 @@ def test_critical_risk():
     assert result.alert_triggered
 
 
-def test_no_data_returns_neutral():
+def test_no_data_returns_insufficient_data():
     model = ClinicalRulesModel()
     result = model.assess({})
-    assert result.risk_score == 50.0
-    assert result.confidence > 0
+    assert result.risk_level == "insufficient_data"
+    assert result.risk_score == 0.0
+    assert result.confidence == 0.0
+    assert result.requires_human_review
+    assert result.confidence_method == "heuristic_uncalibrated"
+
+
+def test_model_metadata_is_versioned():
+    result = ClinicalRulesModel().assess({"phq9_score": 10})
+    assert result.model_version
+    assert result.confidence_method == "heuristic_uncalibrated"
 
 
 def test_explanations_generated():
@@ -257,7 +266,7 @@ def test_confidence_higher_with_critical_features():
 
 
 def test_confidence_bounded():
-    """Confidence should always be in [0.1, 1.0]."""
+    """Confidence is zero only for explicit insufficient-data results."""
     model = ClinicalRulesModel()
     for data in [
         {},
@@ -267,4 +276,7 @@ def test_confidence_bounded():
          "medications": ["clozapine", "lithium", "lorazepam"]},
     ]:
         result = model.assess(data)
-        assert 0.1 <= result.confidence <= 1.0
+        if result.risk_level == "insufficient_data":
+            assert result.confidence == 0.0
+        else:
+            assert 0.1 <= result.confidence <= 1.0

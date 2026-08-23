@@ -4,12 +4,14 @@ All database access uses Firestore via ``src.firebase_admin.get_firestore_client
 """
 
 import logging
+import hashlib
+import json
 import time
 import uuid
 from typing import Any, Dict, Optional
 
 from firebase_admin import firestore
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, Header, HTTPException, Request, status
 
 from src.api.models import (
     ScreeningRequest, ScreeningResponse, RiskScore, RiskScoreResponse,
@@ -24,9 +26,97 @@ from src.api.metrics import (
 )
 from src.firebase_admin import get_firestore_client, persistence_enabled
 from src.risk_model import get_risk_model
+from src.privacy import encrypt_input, minimize_input
+from src.api.rate_limit import limiter
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
+
+
+def _idempotency_document(db: Any, user_id: str, key: str) -> Any:
+    digest = hashlib.sha256(f"{user_id}:{key}".encode("utf-8")).hexdigest()
+    return db.collection("idempotency_keys").document(digest)
+
+
+def _request_fingerprint(payload: Any) -> str:
+    encoded = json.dumps(payload, sort_keys=True, separators=(",", ":"), default=str)
+    return hashlib.sha256(encoded.encode("utf-8")).hexdigest()
+
+
+def _load_idempotent_response(db: Any, user_id: str, key: str, fingerprint: str) -> Any | None:
+    document = _idempotency_document(db, user_id, key).get()
+    if not document.exists:
+        return None
+    stored = document.to_dict() or {}
+    if stored.get("fingerprint") != fingerprint:
+        raise HTTPException(status_code=409, detail="Idempotency-Key was used with a different request")
+    return stored.get("response")
+
+
+def _store_idempotent_response(db: Any, user_id: str, key: str, fingerprint: str, response: Any) -> None:
+    _idempotency_document(db, user_id, key).set({
+        "user_id": user_id,
+        "fingerprint": fingerprint,
+        "response": response,
+        "created_at": firestore.SERVER_TIMESTAMP,
+    })
+
+
+def _commit_screening(db: Any, screening_id: str, user_id: str, anonymized_id: str,
+                      assessment: Any, combined: Dict[str, Any]) -> None:
+    """Commit the screening graph atomically, retrying transient failures."""
+    for attempt in range(3):
+        batch = db.batch()
+        batch.set(db.collection("screenings").document(screening_id), {
+            "id": screening_id,
+            "user_id": user_id,
+            "anonymized_id": anonymized_id,
+            "risk_score": assessment.risk_score,
+            "risk_level": assessment.risk_level,
+            "model_version": assessment.model_version,
+            "confidence_method": assessment.confidence_method,
+            "input_data_encrypted": encrypt_input(combined),
+            "input_data_fields": sorted(minimize_input(combined)),
+            "created_at": firestore.SERVER_TIMESTAMP,
+        })
+        batch.set(db.collection("explanations").document(screening_id), {
+            "id": screening_id,
+            "screening_id": screening_id,
+            "user_id": user_id,
+            "explanation_text": assessment.clinical_interpretation,
+            "factors": {
+                "contributing_factors": assessment.contributing_factors,
+                "confidence": assessment.confidence,
+                "top_features": [{"name": n, "value": v} for n, v in assessment.top_features],
+                "counterfactual": assessment.counterfactual,
+            },
+            "created_at": firestore.SERVER_TIMESTAMP,
+        })
+        if assessment.requires_human_review:
+            batch.set(db.collection("reviews").document(screening_id), {
+                "id": screening_id,
+                "screening_id": screening_id,
+                "user_id": user_id,
+                "status": "pending",
+                "reviewer_uid": None,
+                "notes": None,
+                "created_at": firestore.SERVER_TIMESTAMP,
+                "updated_at": firestore.SERVER_TIMESTAMP,
+            })
+        batch.set(db.collection("audit_logs").document(), {
+            "action": "screening_created",
+            "actor_user_id": user_id,
+            "resource_type": "screening",
+            "resource_id": screening_id,
+            "created_at": firestore.SERVER_TIMESTAMP,
+        })
+        try:
+            batch.commit()
+            return
+        except Exception:
+            if attempt == 2:
+                raise
+            logger.warning("Transient Firestore commit failure for screening %s; retrying", screening_id)
 
 
 # ── Helpers ────────────────────────────────────────────────────────────────
@@ -57,79 +147,56 @@ def _generate_recommendations(risk_level: str, contributing_factors: list) -> li
 # ── POST /screen ───────────────────────────────────────────────────────────
 
 @router.post("/screen", response_model=ScreeningResponse, status_code=status.HTTP_200_OK)
+@limiter.limit("120/minute")
 async def screen_individual(
-    request: ScreeningRequest,
+    request: Request,
+    screening_request: ScreeningRequest,
     auth: AuthResult = Depends(get_current_user),
+    idempotency_key: Optional[str] = Header(default=None, alias="Idempotency-Key"),
 ) -> ScreeningResponse:
     start_time = time.time()
 
-    if not request.consent_verified:
+    if not screening_request.consent_verified:
         raise HTTPException(status_code=403, detail="Consent not verified")
 
+    fingerprint = _request_fingerprint(screening_request.model_dump(mode="json"))
+
     combined: Dict[str, Any] = {}
-    if request.survey_data:
-        combined.update(request.survey_data)
-    if request.wearable_data:
-        combined.update(request.wearable_data)
-    if request.emr_data:
-        combined.update(request.emr_data)
+    if screening_request.survey_data:
+        combined.update(screening_request.survey_data)
+    if screening_request.wearable_data:
+        combined.update(screening_request.wearable_data)
+    if screening_request.emr_data:
+        combined.update(screening_request.emr_data)
 
     model = get_risk_model()
     assessment = model.assess(combined)
 
     db = get_firestore_client()
+    if db is not None and idempotency_key:
+        previous = _load_idempotent_response(db, auth.user_id, idempotency_key, fingerprint)
+        if previous is not None:
+            return ScreeningResponse.model_validate(previous)
     screening_id = str(uuid.uuid4())
 
     if db is not None:
-        db.collection("screenings").document(screening_id).set({
-            "id": screening_id,
-            "user_id": auth.user_id,
-            "anonymized_id": request.anonymized_id,
-            "risk_score": assessment.risk_score,
-            "risk_level": assessment.risk_level,
-            "input_data": combined,
-            "created_at": firestore.SERVER_TIMESTAMP,
-        })
-
-        db.collection("explanations").document(screening_id).set({
-            "id": screening_id,
-            "screening_id": screening_id,
-            "user_id": auth.user_id,
-            "explanation_text": assessment.clinical_interpretation,
-            "factors": {
-                "contributing_factors": assessment.contributing_factors,
-                "confidence": assessment.confidence,
-                "top_features": [{"name": n, "value": v} for n, v in assessment.top_features],
-                "counterfactual": assessment.counterfactual,
-            },
-            "created_at": firestore.SERVER_TIMESTAMP,
-        })
-
-        if assessment.requires_human_review:
-            db.collection("reviews").document(screening_id).set({
-                "id": screening_id,
-                "screening_id": screening_id,
-                "user_id": auth.user_id,
-                "status": "pending",
-                "reviewer_uid": None,
-                "notes": None,
-                "created_at": firestore.SERVER_TIMESTAMP,
-                "updated_at": firestore.SERVER_TIMESTAMP,
-            })
+        _commit_screening(db, screening_id, auth.user_id, screening_request.anonymized_id, assessment, combined)
     else:
         logger.debug("Persistence disabled — skipping Firestore writes for screening %s", screening_id)
 
     risk_score = RiskScore(
-        anonymized_id=request.anonymized_id,
+        anonymized_id=screening_request.anonymized_id,
         score=assessment.risk_score,
         risk_level=RiskLevel(assessment.risk_level),
         confidence=assessment.confidence,
         contributing_factors=assessment.contributing_factors,
-        timestamp=request.timestamp,
+        timestamp=screening_request.timestamp,
+        model_version=assessment.model_version,
+        confidence_method=assessment.confidence_method,
     )
 
     elapsed = time.time() - start_time
-    logger.info("Screening %.3fs — %s score=%.1f level=%s", elapsed, request.anonymized_id, assessment.risk_score, assessment.risk_level)
+    logger.info("Screening %.3fs — %s score=%.1f level=%s", elapsed, screening_request.anonymized_id, assessment.risk_score, assessment.risk_level)
 
     SCREENINGS_TOTAL.labels(risk_level=assessment.risk_level).inc()
     SCREENING_SCORE.observe(assessment.risk_score)
@@ -138,7 +205,7 @@ async def screen_individual(
     if assessment.requires_human_review:
         REVIEWS_CREATED.inc()
 
-    return ScreeningResponse(
+    response = ScreeningResponse(
         risk_score=risk_score,
         recommendations=_generate_recommendations(assessment.risk_level, assessment.contributing_factors),
         explanations=ExplanationSummary(
@@ -149,25 +216,37 @@ async def screen_individual(
         requires_human_review=assessment.requires_human_review,
         alert_triggered=assessment.alert_triggered,
     )
+    if db is not None and idempotency_key:
+        _store_idempotent_response(db, auth.user_id, idempotency_key, fingerprint, response.model_dump(mode="json"))
+    return response
 
 
 # ── POST /batch-screen ────────────────────────────────────────────────────
 
 @router.post("/batch-screen", response_model=BatchScreeningResponse, status_code=status.HTTP_200_OK)
+@limiter.limit("30/minute")
 async def batch_screen(
-    request: BatchScreeningRequest,
+    request: Request,
+    batch_request: BatchScreeningRequest,
     auth: AuthResult = Depends(get_current_user),
+    idempotency_key: Optional[str] = Header(default=None, alias="Idempotency-Key"),
 ) -> BatchScreeningResponse:
-    if any(not item.consent_verified for item in request.requests):
+    if any(not item.consent_verified for item in batch_request.requests):
         raise HTTPException(status_code=403, detail="Consent must be verified for every batch item")
+
+    fingerprint = _request_fingerprint(batch_request.model_dump(mode="json"))
 
     model = get_risk_model()
     db = get_firestore_client()
+    if db is not None and idempotency_key:
+        previous = _load_idempotent_response(db, auth.user_id, idempotency_key, fingerprint)
+        if previous is not None:
+            return BatchScreeningResponse.model_validate(previous)
     results = []
     successful = 0
-    BATCH_SIZE.observe(len(request.requests))
+    BATCH_SIZE.observe(len(batch_request.requests))
 
-    for req in request.requests:
+    for req in batch_request.requests:
         try:
             combined: Dict[str, Any] = {}
             if req.survey_data:
@@ -181,41 +260,7 @@ async def batch_screen(
             screening_id = str(uuid.uuid4())
 
             if db is not None:
-                db.collection("screenings").document(screening_id).set({
-                    "id": screening_id,
-                    "anonymized_id": req.anonymized_id,
-                    "user_id": auth.user_id,
-                    "risk_score": a.risk_score,
-                    "risk_level": a.risk_level,
-                    "input_data": combined,
-                    "created_at": firestore.SERVER_TIMESTAMP,
-                })
-
-                db.collection("explanations").document(screening_id).set({
-                    "id": screening_id,
-                    "screening_id": screening_id,
-                    "user_id": auth.user_id,
-                    "explanation_text": a.clinical_interpretation,
-                    "factors": {
-                        "contributing_factors": a.contributing_factors,
-                        "confidence": a.confidence,
-                        "top_features": [{"name": n, "value": v} for n, v in a.top_features],
-                        "counterfactual": a.counterfactual,
-                    },
-                    "created_at": firestore.SERVER_TIMESTAMP,
-                })
-
-                if a.requires_human_review:
-                    db.collection("reviews").document(screening_id).set({
-                        "id": screening_id,
-                        "screening_id": screening_id,
-                        "user_id": auth.user_id,
-                        "status": "pending",
-                        "reviewer_uid": None,
-                        "notes": None,
-                        "created_at": firestore.SERVER_TIMESTAMP,
-                        "updated_at": firestore.SERVER_TIMESTAMP,
-                    })
+                _commit_screening(db, screening_id, auth.user_id, req.anonymized_id, a, combined)
             else:
                 logger.debug("Persistence disabled — skipping Firestore writes for batch item %s", screening_id)
 
@@ -224,6 +269,7 @@ async def batch_screen(
                     anonymized_id=req.anonymized_id, score=a.risk_score,
                     risk_level=RiskLevel(a.risk_level), confidence=a.confidence,
                     contributing_factors=a.contributing_factors, timestamp=req.timestamp,
+                    model_version=a.model_version, confidence_method=a.confidence_method,
                 ),
                 recommendations=_generate_recommendations(a.risk_level, a.contributing_factors),
                 explanations=ExplanationSummary(
@@ -250,10 +296,13 @@ async def batch_screen(
             ))
             BATCH_ITEMS.labels(status="error").inc()
 
-    return BatchScreeningResponse(
-        results=results, total=len(request.requests),
-        successful=successful, failed=len(request.requests) - successful,
+    response = BatchScreeningResponse(
+        results=results, total=len(batch_request.requests),
+        successful=successful, failed=len(batch_request.requests) - successful,
     )
+    if db is not None and idempotency_key:
+        _store_idempotent_response(db, auth.user_id, idempotency_key, fingerprint, response.model_dump(mode="json"))
+    return response
 
 
 # ── GET /risk-score/{anonymized_id} ───────────────────────────────────────

@@ -1,43 +1,43 @@
-/* Legal pages — shared styles */
+/* Legal pages — inherit MindMetrics tokens from styles.css */
 
 .legal-page {
     max-width: 800px;
     margin: 0 auto;
-    padding: 40px 24px 80px;
-    font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-    color: var(--text-primary, #1a202c);
+    padding: 48px 24px 80px;
+    color: var(--text-main);
     line-height: 1.7;
 }
 
 .legal-page .legal-header {
-    border-bottom: 2px solid var(--primary, #1a365d);
+    border-bottom: 1px solid var(--border-color);
     padding-bottom: 16px;
     margin-bottom: 32px;
 }
 
 .legal-page .legal-header h1 {
-    font-size: 1.8rem;
-    color: var(--primary, #1a365d);
+    font-size: 1.85rem;
+    letter-spacing: -0.03em;
+    color: var(--text-main);
     margin-bottom: 8px;
 }
 
 .legal-page .legal-header .last-updated {
     font-size: 0.85rem;
-    color: var(--text-muted, #718096);
+    color: var(--text-muted);
 }
 
 .legal-page h2 {
-    font-size: 1.25rem;
-    color: var(--primary, #1a365d);
+    font-size: 1.2rem;
+    color: var(--text-main);
     margin-top: 32px;
     margin-bottom: 12px;
     padding-top: 16px;
-    border-top: 1px solid var(--border-light, #e2e8f0);
+    border-top: 1px solid var(--border-color);
 }
 
 .legal-page h3 {
-    font-size: 1.05rem;
-    color: var(--primary-light, #2c5282);
+    font-size: 1.02rem;
+    color: var(--brand-accent);
     margin-top: 20px;
     margin-bottom: 8px;
 }
@@ -45,7 +45,7 @@
 .legal-page p {
     margin-bottom: 14px;
     font-size: 0.95rem;
-    color: var(--text-secondary, #4a5568);
+    color: var(--text-muted);
 }
 
 .legal-page ul, .legal-page ol {
@@ -56,49 +56,53 @@
 .legal-page li {
     margin-bottom: 8px;
     font-size: 0.95rem;
-    color: var(--text-secondary, #4a5568);
+    color: var(--text-muted);
 }
 
 .legal-page a {
-    color: var(--accent, #38b2ac);
+    color: var(--brand-accent);
     text-decoration: none;
 }
 
 .legal-page a:hover {
     text-decoration: underline;
+    text-underline-offset: 3px;
 }
 
 .legal-page .back-link {
-    display: inline-block;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
     margin-bottom: 24px;
-    font-size: 0.9rem;
-    color: var(--accent, #38b2ac);
-}
-
-.legal-page .back-link:hover {
-    text-decoration: underline;
+    font-size: 0.88rem;
+    font-weight: 600;
 }
 
 .legal-page .legal-notice {
-    background: #fff5f5;
-    border-left: 4px solid var(--danger, #e53e3e);
+    background: var(--status-danger-bg);
+    border: 1px solid color-mix(in srgb, var(--status-danger) 35%, var(--border-color));
     padding: 16px 20px;
     margin: 20px 0;
-    border-radius: 0 var(--radius-sm, 6px) var(--radius-sm, 6px) 0;
+    border-radius: var(--radius-input);
 }
 
 .legal-page .legal-notice p {
-    color: #c53030;
-    font-weight: 500;
+    color: var(--status-danger);
+    font-weight: 600;
     margin-bottom: 0;
 }
 
 .legal-page .legal-highlight {
-    background: #ebf8ff;
-    border-left: 4px solid var(--accent, #38b2ac);
+    background: var(--brand-accent-glow);
+    border: 1px solid color-mix(in srgb, var(--brand-accent) 30%, var(--border-color));
     padding: 16px 20px;
     margin: 20px 0;
-    border-radius: 0 var(--radius-sm, 6px) var(--radius-sm, 6px) 0;
+    border-radius: var(--radius-input);
+}
+
+.legal-page .legal-highlight p {
+    color: var(--text-main);
+    margin-bottom: 0;
 }
 
 .legal-page table {
@@ -111,26 +115,31 @@
 .legal-page th, .legal-page td {
     padding: 10px 14px;
     text-align: left;
-    border: 1px solid var(--border-light, #e2e8f0);
+    border: 1px solid var(--border-color);
 }
 
 .legal-page th {
-    background: var(--bg-secondary, #edf2f7);
-    font-weight: 600;
-    color: var(--primary, #1a365d);
+    background: var(--bg-input);
+    font-weight: 650;
+    color: var(--text-main);
+}
+
+.legal-page td {
+    color: var(--text-muted);
 }
 
 .legal-page footer {
     text-align: center;
     padding: 24px 0;
     margin-top: 40px;
-    border-top: 1px solid var(--border-light, #e2e8f0);
+    border-top: 1px solid var(--border-color);
     font-size: 0.85rem;
-    color: var(--text-muted, #718096);
+    color: var(--text-muted);
+    display: block;
 }
 
 .legal-page footer a {
-    color: var(--accent, #38b2ac);
+    color: var(--brand-accent);
 }
 
 @media (max-width: 640px) {

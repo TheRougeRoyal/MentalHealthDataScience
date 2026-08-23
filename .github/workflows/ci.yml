@@ -1,0 +1,38 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  quality:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install ruff mypy pip-audit
+      - name: Run tests
+        env:
+          SECURITY_JWT_SECRET: ci-only-jwt-secret
+          SECURITY_ANONYMIZATION_SALT: ci-only-anonymization-salt
+          SECURITY_DATA_ENCRYPTION_KEY: ZAeWmizAsJdqNlhw3dW-rfgUh6F-8aVfqeMbIGrTBks=
+        run: pytest -q
+      - name: Check formatting
+        run: ruff format --check src tests scripts
+      - name: Lint
+        run: ruff check src tests scripts
+      - name: Type check
+        run: mypy src
+      - name: Audit dependencies
+        run: pip-audit -r requirements.txt
+      - name: Check Firestore authorization policy
+        run: python tests/test_role_isolation.py

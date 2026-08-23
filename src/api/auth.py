@@ -34,6 +34,7 @@ class AuthResult(BaseModel):
     display_name: str | None = None
     photo_url: str | None = None
     provider: str | None = None
+    mfa_verified: bool = False
     error: str | None = None
 
 
@@ -140,31 +141,21 @@ def get_current_user(request: Request) -> AuthResult:
     else:
         provider = sign_in_provider
 
-    # Resolve role with strict isolation:
-    #   - ADMIN_EMAILS is the single bootstrap allowlist (sole admin = aakashrraj2@gmail.com).
-    #   - Firestore is the source of truth after first login: an admin can revoke
-    #     by setting role='user' and we won't re-promote unless the email is in ADMIN_EMAILS.
-    #   - Every other user is a plain 'user'. No 'reviewer' role is created by default.
-    ADMIN_EMAILS = {"aakashrraj2@gmail.com"}
-    is_admin_email = bool(email and email.lower() in ADMIN_EMAILS)
-    default_role = "admin" if is_admin_email else "user"
+    # Firebase custom claims are the runtime source of truth. Email addresses
+    # are identity metadata, never authorization credentials.
+    is_admin = decoded.get("admin") is True or decoded.get("role") == "admin"
+    default_role = "admin" if is_admin else "user"
     role = default_role
+    mfa_verified = bool(firebase_claims.get("sign_in_second_factor"))
     try:
         db = get_firestore_client()
         user_doc = db.collection("users").document(uid).get()
         if user_doc.exists:
             user_data = user_doc.to_dict()
             stored_role = user_data.get("role")
-            if is_admin_email:
-                # Admin email is always admin; never demote.
-                if stored_role != "admin":
-                    db.collection("users").document(uid).update({"role": "admin"})
-                role = "admin"
-            else:
-                # Plain users always get 'user' role — never inherit stale 'admin' or 'reviewer'.
-                role = "user"
-                if stored_role != "user":
-                    db.collection("users").document(uid).update({"role": "user"})
+            role = "admin" if is_admin else "user"
+            if stored_role != role:
+                db.collection("users").document(uid).update({"role": role})
             display_name = user_data.get("display_name", display_name)
             photo_url = user_data.get("photo_url", photo_url)
         else:
@@ -191,6 +182,7 @@ def get_current_user(request: Request) -> AuthResult:
         display_name=display_name,
         photo_url=photo_url,
         provider=provider,
+        mfa_verified=mfa_verified,
     )
 
 
@@ -208,6 +200,8 @@ def require_role(*allowed_roles: str):
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail=f"Role '{auth.role}' not allowed. Required: {', '.join(allowed_roles)}",
             )
+        if auth.role == "admin" and os.environ.get("REQUIRE_ADMIN_MFA", "true").lower() == "true" and not auth.mfa_verified:
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="MFA is required for administrator access")
         return auth
     return _checker
 

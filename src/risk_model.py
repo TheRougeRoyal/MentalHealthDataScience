@@ -67,7 +67,7 @@ class AssessmentResult:
 
     probability: float          # 0 → 1
     risk_score: float           # 0 → 100
-    risk_level: str             # low | moderate | high | critical
+    risk_level: str             # insufficient_data | low | moderate | high | critical
     confidence: float           # 0 → 1
     contributing_factors: List[str] = field(default_factory=list)
     top_features: List[Tuple[str, float]] = field(default_factory=list)
@@ -75,6 +75,8 @@ class AssessmentResult:
     counterfactual: str = ""
     alert_triggered: bool = False
     requires_human_review: bool = False
+    model_version: str = settings.ml.model_version
+    confidence_method: str = "heuristic_uncalibrated"
 
 
 # ---------------------------------------------------------------------------
@@ -102,6 +104,20 @@ class RiskModel(ABC):
 
     def assess(self, input_data: Dict[str, Any]) -> AssessmentResult:
         """Run the full score → classify → explain pipeline."""
+        if not any(input_data.get(key) is not None for key in _FEATURE_WEIGHTS):
+            return AssessmentResult(
+                probability=0.0,
+                risk_score=0.0,
+                risk_level="insufficient_data",
+                confidence=0.0,
+                contributing_factors=[],
+                clinical_interpretation=(
+                    "Insufficient structured data for a risk assessment. "
+                    "This result is not a clinical determination."
+                ),
+                requires_human_review=True,
+            )
+
         probability = self.score(input_data)
         risk_level, risk_score, alert, needs_review = self.classify(probability)
         factors, top_features, clinical, counter = self.explain(

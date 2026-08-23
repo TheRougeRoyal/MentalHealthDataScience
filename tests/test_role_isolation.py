@@ -2,7 +2,7 @@
 
 Verifies the two policy primitives that gate strict user/admin isolation:
 
-  1. ``src/api/auth.py`` defines exactly the bootstrap admin email.
+    1. ``src/api/auth.py`` uses claims or protected UID configuration for admins.
   2. ``firestore.rules`` denies non-admins from reading other users' data.
 
 Run:
@@ -23,25 +23,20 @@ def _read(p: Path) -> str:
     return p.read_text(encoding="utf-8")
 
 
-def check_auth_admin_email() -> str:
-    """Only aakashrraj2@gmail.com is bootstrap admin."""
+def check_auth_admin_source() -> str:
+    """Admin authorization must not contain an email allowlist."""
     src = _read(ROOT / "src" / "api" / "auth.py")
-    m = re.search(r"ADMIN_EMAILS\s*=\s*\{([^}]+)\}", src)
-    assert m, "ADMIN_EMAILS set literal missing"
-    emails = {e.strip().strip('"').strip("'").lower() for e in m.group(1).split(",") if e.strip()}
-    assert emails == {"aakashrraj2@gmail.com"}, f"unexpected admin emails: {emails}"
-    return f"admin emails = {sorted(emails)}"
+    assert "ADMIN_EMAILS" not in src, "admin email allowlist must be removed"
+    assert 'decoded.get("admin")' in src, "Firebase admin claim check missing"
+    return "admin authorization uses UID configuration or Firebase claims"
 
 
 def check_auth_no_reviewer_promotion() -> str:
-    """Non-admin emails must always resolve to role='user'."""
+    """Roles must come from claims/configuration, not stale email identity."""
     src = _read(ROOT / "src" / "api" / "auth.py")
-    # The function body of get_current_user must demote stored 'reviewer' or 'admin'
-    # to 'user' for non-admin emails.
-    assert 'role = "user"' in src, "auth.py must force role='user' for non-admin emails"
-    # And the if/else structure should never reach "admin" without the email check.
-    # Ponytail: a coarse substring test is enough.
-    return "auth.py demotes non-admin emails to 'user'"
+    assert 'role = "admin" if is_admin else "user"' in src, "auth.py must derive role from admin eligibility"
+    assert "stored_role" in src, "auth.py must normalize the stored role"
+    return "auth.py derives roles from claims/configuration"
 
 
 def check_reviews_admin_only() -> str:
@@ -105,7 +100,7 @@ def check_admin_endpoint_registered() -> str:
 
 def main() -> int:
     checks = [
-        check_auth_admin_email,
+        check_auth_admin_source,
         check_auth_no_reviewer_promotion,
         check_reviews_admin_only,
         check_firestore_user_isolation,

@@ -52,6 +52,22 @@ function initTheme() {
     document.documentElement.setAttribute('data-theme', savedTheme);
     document.body.className = savedTheme;
     updateThemeToggleUI(savedTheme);
+    restoreSidebar();
+}
+
+function toggleSidebar() {
+    const wrap = document.getElementById('app-wrapper');
+    if (!wrap) return;
+    wrap.classList.toggle('collapsed-sidebar');
+    localStorage.setItem('sidebar-collapsed', wrap.classList.contains('collapsed-sidebar') ? '1' : '0');
+}
+
+function restoreSidebar() {
+    const wrap = document.getElementById('app-wrapper');
+    if (!wrap) return;
+    if (localStorage.getItem('sidebar-collapsed') === '1') {
+        wrap.classList.add('collapsed-sidebar');
+    }
 }
 
 function toggleTheme() {
@@ -283,7 +299,7 @@ function applyRoleGating(role) {
     // Clear any pre-loaded admin data from the DOM if a non-admin just signed in.
     if (!isAdmin) {
         const q = document.getElementById('review-queue-list');
-        if (q) q.innerHTML = '<p style="color: var(--text-muted);">Review queue is admin-only.</p>';
+        if (q) q.innerHTML = '<p class="empty-hint">Review queue is admin-only.</p>';
     }
 }
 
@@ -395,7 +411,12 @@ function redirectToWorkspace() {
 function toggleMobileMenu() {
     const drawer = document.getElementById('mobile-drawer');
     if (!drawer) return;
-    drawer.classList.toggle('open');
+    const open = drawer.classList.toggle('open');
+    const btn = document.getElementById('mobile-menu-btn');
+    if (btn) {
+        btn.setAttribute('aria-expanded', open ? 'true' : 'false');
+        btn.setAttribute('aria-label', open ? 'Close menu' : 'Open menu');
+    }
 }
 
 function initDashboardNavigation() {
@@ -577,11 +598,11 @@ function renderStatistics(data) {
         <div class="analysis-grid" style="margin-bottom: 20px;">
             <div>
                 <span class="stat-label">Mean Risk Score</span>
-                <strong>${Number(stats.avg_risk_score || 0).toFixed(1)} <span style="font-size:0.75rem; color:var(--text-muted); font-weight:normal;">/ 100</span></strong>
+                <strong>${Number(stats.avg_risk_score || 0).toFixed(1)} <span class="hint">/ 100</span></strong>
             </div>
             <div>
                 <span class="stat-label">Median (IQR)</span>
-                <strong>${Number(stats.median_risk_score || 0).toFixed(1)} <span style="font-size:0.75rem; color:var(--text-muted); font-weight:normal;">score</span></strong>
+                <strong>${Number(stats.median_risk_score || 0).toFixed(1)} <span class="hint">score</span></strong>
             </div>
             <div>
                 <span class="stat-label">Min / Max Range</span>
@@ -589,34 +610,34 @@ function renderStatistics(data) {
             </div>
             <div>
                 <span class="stat-label">Critical / High Prevalence</span>
-                <strong style="color:${highCount > 0 ? 'var(--status-danger)' : 'var(--text-main)'};">${stats.high_risk_count || 0} <span style="font-size:0.75rem; color:var(--text-muted); font-weight:normal;">(${(stats.high_risk_pct || 0).toFixed(1)}%)</span></strong>
+                <strong style="color:${highCount > 0 ? 'var(--status-danger)' : 'var(--text-main)'};">${stats.high_risk_count || 0} <span class="hint">(${(stats.high_risk_pct || 0).toFixed(1)}%)</span></strong>
             </div>
         </div>
 
-        <div style="background: var(--bg-input); border: 1px solid var(--border-color); padding: 18px; border-radius: var(--radius-input);">
-            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
-                <h4 style="margin: 0; font-size: 0.875rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.03em; color: var(--text-muted);">Population Risk Stratification</h4>
-                <span style="font-size: 0.8125rem; color: var(--text-muted); font-weight: 500;">N = ${total} records</span>
+        <div class="strat-card">
+            <div class="section-toolbar" style="margin-bottom: 10px;">
+                <h4 class="panel-label" style="margin:0;">Population Risk Stratification</h4>
+                <span class="muted" style="font-size: 0.8125rem;">N = ${total} records</span>
             </div>
             
-            <div style="display: flex; height: 16px; border-radius: var(--radius-pill); overflow: hidden; background: var(--bg-card); border: 1px solid var(--border-color); margin-bottom: 14px;">
+            <div class="strat-bar">
                 <div style="width: ${lowPct}%; background: var(--status-success);" title="Low Risk: ${lowCount} (${lowPct}%)"></div>
                 <div style="width: ${modPct}%; background: var(--status-warning);" title="Moderate Risk: ${modCount} (${modPct}%)"></div>
                 <div style="width: ${highPct}%; background: var(--status-danger);" title="High Risk: ${highCount} (${highPct}%)"></div>
             </div>
 
-            <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; font-size: 0.8125rem;">
-                <div style="display: flex; align-items: center; gap: 8px;">
-                    <span style="width: 10px; height: 10px; border-radius: 50%; background: var(--status-success);"></span>
-                    <span>Low Risk: <strong style="color: var(--text-main);">${lowCount}</strong> (${lowPct}%)</span>
+            <div class="legend-row">
+                <div class="legend-item">
+                    <span class="swatch swatch-low"></span>
+                    <span>Low Risk: <strong>${lowCount}</strong> (${lowPct}%)</span>
                 </div>
-                <div style="display: flex; align-items: center; gap: 8px;">
-                    <span style="width: 10px; height: 10px; border-radius: 50%; background: var(--status-warning);"></span>
-                    <span>Moderate: <strong style="color: var(--text-main);">${modCount}</strong> (${modPct}%)</span>
+                <div class="legend-item">
+                    <span class="swatch swatch-mod"></span>
+                    <span>Moderate: <strong>${modCount}</strong> (${modPct}%)</span>
                 </div>
-                <div style="display: flex; align-items: center; gap: 8px;">
-                    <span style="width: 10px; height: 10px; border-radius: 50%; background: var(--status-danger);"></span>
-                    <span>High+: <strong style="color: var(--text-main);">${highCount}</strong> (${highPct}%)</span>
+                <div class="legend-item">
+                    <span class="swatch swatch-high"></span>
+                    <span>High+: <strong>${highCount}</strong> (${highPct}%)</span>
                 </div>
             </div>
         </div>`;
