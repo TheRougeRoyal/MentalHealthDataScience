@@ -172,7 +172,14 @@ async def screen_individual(
     model = get_risk_model()
     assessment = model.assess(combined)
 
-    db = get_firestore_client()
+    try:
+        db = get_firestore_client()
+    except Exception as exc:
+        logger.error("Screening persistence client unavailable: %s", exc, exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Assessment persistence is unavailable. Check Firebase and encryption configuration.",
+        ) from exc
     if db is not None and idempotency_key:
         previous = _load_idempotent_response(db, auth.user_id, idempotency_key, fingerprint)
         if previous is not None:
@@ -180,7 +187,14 @@ async def screen_individual(
     screening_id = str(uuid.uuid4())
 
     if db is not None:
-        _commit_screening(db, screening_id, auth.user_id, screening_request.anonymized_id, assessment, combined)
+        try:
+            _commit_screening(db, screening_id, auth.user_id, screening_request.anonymized_id, assessment, combined)
+        except Exception as exc:
+            logger.error("Screening persistence failed: %s", exc, exc_info=True)
+            raise HTTPException(
+                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                detail="Assessment persistence is unavailable. Check Firebase and encryption configuration.",
+            ) from exc
     else:
         logger.debug("Persistence disabled — skipping Firestore writes for screening %s", screening_id)
 
@@ -237,7 +251,14 @@ async def batch_screen(
     fingerprint = _request_fingerprint(batch_request.model_dump(mode="json"))
 
     model = get_risk_model()
-    db = get_firestore_client()
+    try:
+        db = get_firestore_client()
+    except Exception as exc:
+        logger.error("Batch screening persistence client unavailable: %s", exc, exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Assessment persistence is unavailable. Check Firebase and encryption configuration.",
+        ) from exc
     if db is not None and idempotency_key:
         previous = _load_idempotent_response(db, auth.user_id, idempotency_key, fingerprint)
         if previous is not None:
@@ -260,7 +281,11 @@ async def batch_screen(
             screening_id = str(uuid.uuid4())
 
             if db is not None:
-                _commit_screening(db, screening_id, auth.user_id, req.anonymized_id, a, combined)
+                try:
+                    _commit_screening(db, screening_id, auth.user_id, req.anonymized_id, a, combined)
+                except Exception as exc:
+                    logger.error("Batch screening persistence failed: %s", exc, exc_info=True)
+                    raise RuntimeError("Assessment persistence is unavailable") from exc
             else:
                 logger.debug("Persistence disabled — skipping Firestore writes for batch item %s", screening_id)
 

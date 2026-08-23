@@ -138,7 +138,8 @@ def test_firestore_unavailable_during_screening_returns_generic_error(client, mo
         "consent_verified": True,
         "survey_data": {"phq9_score": 10},
     })
-    assert r.status_code == 500
+    assert r.status_code == 503
+    assert r.json()["detail"] == "Assessment persistence is unavailable. Check Firebase and encryption configuration."
     assert "private Firestore details" not in r.text
 
 
