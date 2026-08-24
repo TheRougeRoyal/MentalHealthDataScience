@@ -136,21 +136,22 @@ const _inlineFbConfig = {
     measurementId: window.FIREBASE_MEASUREMENT_ID,
 };
 let _fbConfigured = !!(window.FIREBASE_API_KEY && window.FIREBASE_AUTH_DOMAIN && window.FIREBASE_PROJECT_ID);
-if (!_fbConfigured) {
-    console.error('[firebase] Web SDK not configured. Set window.FIREBASE_API_KEY / FIREBASE_AUTH_DOMAIN / FIREBASE_PROJECT_ID before app.js loads. See index.html comments.');
-    showError('Sign-in is not configured for this deployment. Set Firebase web config in index.html.');
-}
-try {
-    if (!firebase.apps.length) firebase.initializeApp(_fbConfigured ? _inlineFbConfig : { apiKey: 'invalid' });
-} catch (e) {
-    console.error('[firebase] initializeApp failed:', e);
-    showError(`Firebase init failed: ${e.message}`);
-}
+let auth = null;
+let db = null;
+let googleProvider = null;
 
-let auth = firebase.auth();
-let db = firebase.firestore ? firebase.firestore() : null;
-let googleProvider = new firebase.auth.GoogleAuthProvider();
-googleProvider.setCustomParameters({ prompt: 'select_account' });
+if (_fbConfigured) {
+    try {
+        if (!firebase.apps.length) firebase.initializeApp(_inlineFbConfig);
+        auth = firebase.auth();
+        db = firebase.firestore ? firebase.firestore() : null;
+        googleProvider = new firebase.auth.GoogleAuthProvider();
+        googleProvider.setCustomParameters({ prompt: 'select_account' });
+    } catch (e) {
+        console.error('[firebase] initializeApp failed:', e);
+        showError(`Firebase init failed: ${e.message}`);
+    }
+}
 
 let _fbUser = null;
 let _firebaseInitPromise = null;
@@ -189,6 +190,7 @@ async function googleSignIn() {
 }
 
 async function firebaseLogin() {
+    if (!(await ensureFirebaseReady())) return;
     const email = document.getElementById('login-email').value.trim();
     const password = document.getElementById('login-password').value.trim();
     if (!email || !password) { showError('Please enter email and password'); return; }
@@ -204,6 +206,7 @@ async function firebaseLogin() {
 }
 
 async function firebaseRegister() {
+    if (!(await ensureFirebaseReady())) return;
     const email = document.getElementById('login-email').value.trim();
     const password = document.getElementById('login-password').value.trim();
     if (!email || !password) { showError('Please enter email and password'); return; }
