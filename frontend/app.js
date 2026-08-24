@@ -135,13 +135,13 @@ const _inlineFbConfig = {
     appId: window.FIREBASE_APP_ID,
     measurementId: window.FIREBASE_MEASUREMENT_ID,
 };
-const _fbConfigured = !!(window.FIREBASE_API_KEY && window.FIREBASE_AUTH_DOMAIN && window.FIREBASE_PROJECT_ID);
+let _fbConfigured = !!(window.FIREBASE_API_KEY && window.FIREBASE_AUTH_DOMAIN && window.FIREBASE_PROJECT_ID);
 if (!_fbConfigured) {
     console.error('[firebase] Web SDK not configured. Set window.FIREBASE_API_KEY / FIREBASE_AUTH_DOMAIN / FIREBASE_PROJECT_ID before app.js loads. See index.html comments.');
     showError('Sign-in is not configured for this deployment. Set Firebase web config in index.html.');
 }
 try {
-    if (!firebase.apps.length) firebase.initializeApp(_fbConfigured ? _fbConfig : { apiKey: 'invalid' });
+    if (!firebase.apps.length) firebase.initializeApp(_fbConfigured ? _inlineFbConfig : { apiKey: 'invalid' });
 } catch (e) {
     console.error('[firebase] initializeApp failed:', e);
     showError(`Firebase init failed: ${e.message}`);
@@ -233,7 +233,7 @@ async function firebaseLogout() {
     showSuccess('Signed out');
 }
 
-function showAuthState(user) {
+async function showAuthState(user) {
     document.getElementById('login-form').style.display = 'none';
     document.getElementById('user-info').style.display = '';
 
