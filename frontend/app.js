@@ -51,6 +51,80 @@ function updateThemeToggleUI(theme) {
 
 document.addEventListener('DOMContentLoaded', initTheme);
 
+// ── Control wiring ─────────────────────────────────────────────────────────
+// The original markup uses inline `onclick` handlers. Those handlers are
+// blocked by many otherwise sensible Content-Security-Policy configurations,
+// which makes the entire interface look unresponsive. Convert the existing
+// declarative handlers to event listeners once the page is ready instead.
+function installControlHandlers() {
+    const actionPattern = /^([A-Za-z_$][\w$]*)\(\)$/;
+
+    // A button without an explicit type becomes a submit button when a form is
+    // introduced around it. All actions here are JavaScript controls, so make
+    // that behaviour explicit and stable.
+    document.querySelectorAll('button:not([type])').forEach((button) => {
+        button.type = 'button';
+    });
+
+    document.querySelectorAll('[onclick], [onchange]').forEach((element) => {
+        const attribute = element.hasAttribute('onclick') ? 'onclick' : 'onchange';
+        const source = element.getAttribute(attribute)?.trim() || '';
+        const functionMatch = source.match(actionPattern);
+        const destinationMatch = source.match(/^window\.location\.href\s*=\s*['\"]([^'\"]+)['\"]$/);
+
+        if (functionMatch) {
+            element.dataset[attribute === 'onclick' ? 'action' : 'changeAction'] = functionMatch[1];
+            element.removeAttribute(attribute);
+        } else if (destinationMatch) {
+            element.dataset.navigateTo = destinationMatch[1];
+            element.removeAttribute(attribute);
+        }
+    });
+
+    const invokeAction = (action, control, event) => {
+        if (!action) return;
+
+        if (action === 'selectReview') {
+            selectReview(control.dataset.reviewId, control);
+            return;
+        }
+
+        const handler = window[action];
+        if (typeof handler !== 'function') return;
+
+        // Preserve anchor navigation (mobile navigation closes its drawer and
+        // then follows the link), while preventing a button's form default.
+        if (control.tagName === 'BUTTON') event.preventDefault();
+        const result = handler();
+        if (result && typeof result.catch === 'function') {
+            result.catch((error) => {
+                console.error(`Action ${action} failed:`, error);
+                showError(`Action failed: ${error.message || 'Please try again.'}`);
+            });
+        }
+    };
+
+    document.addEventListener('click', (event) => {
+        const control = event.target.closest('[data-action], [data-navigate-to]');
+        if (!control) return;
+
+        if (control.dataset.navigateTo) {
+            event.preventDefault();
+            window.location.href = control.dataset.navigateTo;
+            return;
+        }
+
+        invokeAction(control.dataset.action, control, event);
+    });
+
+    document.addEventListener('change', (event) => {
+        const control = event.target.closest('[data-change-action]');
+        if (control) invokeAction(control.dataset.changeAction, control, event);
+    });
+}
+
+document.addEventListener('DOMContentLoaded', installControlHandlers);
+
 // ── Firebase Auth ──────────────────────────────────────────────────────────
 const _inlineFbConfig = {
     apiKey: window.FIREBASE_API_KEY,
@@ -1025,7 +1099,7 @@ function renderReviewQueueItems(reviews, filter) {
     reviews.forEach(r => {
         const level = (r.risk_level || 'low').toLowerCase();
         const badgeClass = level === 'high' ? 'badge-high' : level === 'medium' || level === 'moderate' ? 'badge-medium' : 'badge-low';
-        html += `<div class="review-item" onclick="selectReview('${r.id}', this)" data-review='${JSON.stringify(r).replace(/'/g, "&#39;")}' style="padding:12px 16px; background:var(--bg-input); border:1px solid var(--border-color); border-radius:var(--radius-input); cursor:pointer; display:flex; justify-content:space-between; align-items:center;"><div style="display:flex; align-items:center; gap:12px;"><strong>${r.anonymized_id || 'ID N/A'}</strong><span class="badge ${badgeClass}">${r.risk_level || '-'}</span><span style="color:var(--text-muted); font-size:0.85rem;">Score: ${r.risk_score != null ? r.risk_score.toFixed(1) : '-'}</span></div><span class="badge" style="background:var(--bg-card); color:var(--text-main); border:1px solid var(--border-color);">${r.status}</span></div>`;
+        html += `<div class="review-item" data-action="selectReview" data-review-id="${r.id}" data-review='${JSON.stringify(r).replace(/'/g, "&#39;")}' style="padding:12px 16px; background:var(--bg-input); border:1px solid var(--border-color); border-radius:var(--radius-input); cursor:pointer; display:flex; justify-content:space-between; align-items:center;"><div style="display:flex; align-items:center; gap:12px;"><strong>${r.anonymized_id || 'ID N/A'}</strong><span class="badge ${badgeClass}">${r.risk_level || '-'}</span><span style="color:var(--text-muted); font-size:0.85rem;">Score: ${r.risk_score != null ? r.risk_score.toFixed(1) : '-'}</span></div><span class="badge" style="background:var(--bg-card); color:var(--text-main); border:1px solid var(--border-color);">${r.status}</span></div>`;
     });
     list.innerHTML = html + '</div>';
 }
