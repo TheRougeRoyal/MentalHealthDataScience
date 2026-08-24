@@ -16,7 +16,8 @@
     { "src": "frontend/batch.html", "use": "@vercel/static" },
     { "src": "frontend/statistics.html", "use": "@vercel/static" },
     { "src": "frontend/queue.html", "use": "@vercel/static" },
-    { "src": "frontend/validate.html", "use": "@vercel/static" }
+    { "src": "frontend/validate.html", "use": "@vercel/static" },
+    { "src": "frontend/partials/chrome.js", "use": "@vercel/static" }
   ],
   "routes": [
     { "src": "/docs", "dest": "/frontend/docs.html" },

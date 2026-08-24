@@ -270,7 +270,7 @@ async function showAuthState(user) {
 
     await fetchMe();
 
-    if (window._pageScope === 'profile') loadProfilePage();
+    if (document.body.dataset.page === 'profile') loadProfilePage();
 }
 
 async function fetchMe() {
@@ -330,9 +330,10 @@ function applyRoleGating(role) {
 
 window.addEventListener('DOMContentLoaded', () => {
     checkSystemStatus();
-    if (window._pageScope === 'dashboard') initDashboardNavigation();
-    if (window._pageScope === 'screening') initSimulator();
-    if (window._pageScope === 'profile') initProfile();
+    const page = document.body.dataset.page;
+    if (page === 'dashboard') initDashboardNavigation();
+    if (page === 'screening') initSimulator();
+    if (page === 'profile') initProfile();
     initializeFirebaseAuth();
 });
 

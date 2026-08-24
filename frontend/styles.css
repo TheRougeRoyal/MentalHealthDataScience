@@ -332,6 +332,35 @@ body::before {
     color: var(--text-main);
     background: var(--brand-accent-glow);
     border-color: color-mix(in srgb, var(--brand-accent) 28%, transparent);
+    box-shadow: inset 2px 0 0 var(--brand-accent);
+}
+
+/* ponytail: brief skeleton while the chrome partial mounts. Prevents the
+   "main content shows for one frame, then jumps" effect. */
+.chrome-loading {
+    min-height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--text-muted);
+    font-size: 0.85rem;
+}
+.chrome-loading::before {
+    content: '';
+    width: 14px;
+    height: 14px;
+    margin-right: 10px;
+    border: 2px solid var(--border-color);
+    border-top-color: var(--brand-accent);
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+}
+
+/* ponytail: visible "you forgot to fill this slot" marker for page authors. */
+.chrome-missing {
+    color: var(--text-muted);
+    font-size: 0.85rem;
+    font-style: italic;
 }
 
 .nav-icon {
