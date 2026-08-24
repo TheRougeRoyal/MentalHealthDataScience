@@ -147,12 +147,13 @@ try {
     showError(`Firebase init failed: ${e.message}`);
 }
 
-const auth = firebase.auth();
-const db = firebase.firestore ? firebase.firestore() : null;
-const googleProvider = new firebase.auth.GoogleAuthProvider();
+let auth = firebase.auth();
+let db = firebase.firestore ? firebase.firestore() : null;
+let googleProvider = new firebase.auth.GoogleAuthProvider();
 googleProvider.setCustomParameters({ prompt: 'select_account' });
 
 let _fbUser = null;
+let _firebaseInitPromise = null;
 
 // ── Token management ───────────────────────────────────────────────────────
 
