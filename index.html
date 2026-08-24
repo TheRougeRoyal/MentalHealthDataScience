@@ -203,8 +203,14 @@
                     </div>
                 </div>
                 <div id="user-info" style="display:none;">
-                    <p style="font-size:0.95rem;">Authenticated as <strong id="user-display-name"></strong> <span id="user-role-badge" class="badge badge-low">User</span></p>
-                    <button onclick="firebaseLogout()" class="btn btn-secondary" style="margin-top:12px;">Sign Out</button>
+                    <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 12px;">
+                        <img id="user-avatar" src="" alt="User avatar" style="width: 40px; height: 40px; border-radius: 50%; display: none;">
+                        <div>
+                            <p style="font-size:0.95rem; margin: 0;">Authenticated as <strong id="user-display-name"></strong></p>
+                            <span id="user-role-badge" class="badge badge-low">User</span>
+                        </div>
+                    </div>
+                    <button onclick="firebaseLogout()" class="btn btn-secondary">Sign Out</button>
                 </div>
             </section>
 

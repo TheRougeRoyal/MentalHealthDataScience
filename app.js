@@ -2,6 +2,36 @@ const API_BASE_URL = window.location.hostname === 'localhost'
   ? 'http://localhost:8000'
   : '/api';
 
+// ── Utilities (defined first to avoid hoisting issues) ────────────────────
+function showError(msg) { 
+    const e = document.getElementById('error-display'); 
+    if (!e) { console.error('[showError] element not found:', msg); return; }
+    e.textContent = msg; 
+    e.style.display = 'block'; 
+    e.className = 'error-message'; 
+    e.scrollIntoView({ behavior: 'smooth' }); 
+}
+function hideError() { 
+    const e = document.getElementById('error-display'); 
+    if (e) e.style.display = 'none'; 
+}
+function hideResults() { 
+    const e = document.getElementById('results-section'); 
+    if (e) e.style.display = 'none'; 
+}
+function showSuccess(msg) { 
+    const e = document.getElementById('error-display'); 
+    if (!e) { console.log('[showSuccess]', msg); return; }
+    e.className = 'success-message'; 
+    e.textContent = msg; 
+    e.style.display = 'block'; 
+    setTimeout(() => { e.style.display = 'none'; }, 3000); 
+}
+function showLoading(show) { 
+    const e = document.getElementById('loading'); 
+    if (e) e.style.display = show ? 'block' : 'none'; 
+}
+
 // ── Theme Management (Dark by Default) ─────────────────────────────────────
 function initTheme() {
     const savedTheme = localStorage.getItem('theme') || 'dark';
@@ -51,13 +81,11 @@ const _fbConfig = {
 const _fbConfigured = !!(window.FIREBASE_API_KEY && window.FIREBASE_AUTH_DOMAIN && window.FIREBASE_PROJECT_ID);
 if (!_fbConfigured) {
     console.error('[firebase] Web SDK not configured. Set window.FIREBASE_API_KEY / FIREBASE_AUTH_DOMAIN / FIREBASE_PROJECT_ID before app.js loads. See index.html comments.');
-    showError('Sign-in is not configured for this deployment. Set Firebase web config in index.html.');
 }
 try {
     if (!firebase.apps.length) firebase.initializeApp(_fbConfigured ? _fbConfig : { apiKey: 'invalid' });
 } catch (e) {
     console.error('[firebase] initializeApp failed:', e);
-    showError(`Firebase init failed: ${e.message}`);
 }
 
 const auth = firebase.auth();
@@ -98,8 +126,16 @@ async function googleSignIn() {
 }
 
 async function firebaseLogin() {
-    const email = document.getElementById('login-email').value.trim();
-    const password = document.getElementById('login-password').value.trim();
+    const emailEl = document.getElementById('login-email');
+    const passwordEl = document.getElementById('login-password');
+    
+    if (!emailEl || !passwordEl) {
+        showError('Login form not found');
+        return;
+    }
+    
+    const email = emailEl.value.trim();
+    const password = passwordEl.value.trim();
     if (!email || !password) { showError('Please enter email and password'); return; }
 
     try {
@@ -110,8 +146,16 @@ async function firebaseLogin() {
 }
 
 async function firebaseRegister() {
-    const email = document.getElementById('login-email').value.trim();
-    const password = document.getElementById('login-password').value.trim();
+    const emailEl = document.getElementById('login-email');
+    const passwordEl = document.getElementById('login-password');
+    
+    if (!emailEl || !passwordEl) {
+        showError('Registration form not found');
+        return;
+    }
+    
+    const email = emailEl.value.trim();
+    const password = passwordEl.value.trim();
     if (!email || !password) { showError('Please enter email and password'); return; }
     if (password.length < 6) { showError('Password must be at least 6 characters'); return; }
 
@@ -130,23 +174,28 @@ async function firebaseLogout() {
         await auth.signOut();
     } catch (_) {}
     _fbUser = null;
-    document.getElementById('login-form').style.display = '';
-    document.getElementById('user-info').style.display = 'none';
-    document.getElementById('user-avatar').style.display = 'none';
+    const loginForm = document.getElementById('login-form');
+    const userInfo = document.getElementById('user-info');
+    const userAvatar = document.getElementById('user-avatar');
+    if (loginForm) loginForm.style.display = '';
+    if (userInfo) userInfo.style.display = 'none';
+    if (userAvatar) userAvatar.style.display = 'none';
     showSuccess('Signed out');
 }
 
 function showAuthState(user) {
-    document.getElementById('login-form').style.display = 'none';
-    document.getElementById('user-info').style.display = '';
+    const loginForm = document.getElementById('login-form');
+    const userInfo = document.getElementById('user-info');
+    if (loginForm) loginForm.style.display = 'none';
+    if (userInfo) userInfo.style.display = '';
 
     // Show avatar if available (Google users have photoURL)
     const avatar = document.getElementById('user-avatar');
-    if (user.photoURL) {
+    if (avatar && user.photoURL) {
         avatar.src = user.photoURL;
         avatar.alt = user.displayName || user.email || '';
         avatar.style.display = '';
-    } else {
+    } else if (avatar) {
         avatar.style.display = 'none';
     }
 
@@ -160,15 +209,23 @@ async function fetchMe() {
         if (r.ok) {
             const u = await r.json();
             const badge = document.getElementById('user-role-badge');
-            badge.textContent = u.role;
-            badge.className = `risk-badge ${u.role === 'admin' ? 'moderate' : 'low'}`;
-            document.getElementById('user-display-name').textContent = u.display_name || u.email || u.uid;
+            const displayName = document.getElementById('user-display-name');
+            
+            if (badge) {
+                badge.textContent = u.role;
+                badge.className = `risk-badge ${u.role === 'admin' ? 'moderate' : 'low'}`;
+            }
+            if (displayName) {
+                displayName.textContent = u.display_name || u.email || u.uid;
+            }
 
             // Update avatar if backend has a photo_url
             if (u.photo_url) {
                 const avatar = document.getElementById('user-avatar');
-                avatar.src = u.photo_url;
-                avatar.style.display = '';
+                if (avatar) {
+                    avatar.src = u.photo_url;
+                    avatar.style.display = '';
+                }
             }
         }
     } catch (_) {}
@@ -177,6 +234,11 @@ async function fetchMe() {
 // ── Init ──────────────────────────────────────────────────────────────────
 
 window.addEventListener('DOMContentLoaded', () => {
+    // Show any Firebase configuration errors now that DOM is ready
+    if (!_fbConfigured) {
+        showError('Sign-in is not configured for this deployment. Set Firebase web config in index.html.');
+    }
+    
     checkSystemStatus();
     initSimulator();
 
@@ -202,9 +264,12 @@ window.addEventListener('DOMContentLoaded', () => {
             checkSystemStatus();
         } else {
             _fbUser = null;
-            document.getElementById('login-form').style.display = '';
-            document.getElementById('user-info').style.display = 'none';
-            document.getElementById('user-avatar').style.display = 'none';
+            const loginForm = document.getElementById('login-form');
+            const userInfo = document.getElementById('user-info');
+            const userAvatar = document.getElementById('user-avatar');
+            if (loginForm) loginForm.style.display = '';
+            if (userInfo) userInfo.style.display = 'none';
+            if (userAvatar) userAvatar.style.display = 'none';
         }
     });
 });
@@ -358,22 +423,30 @@ function updateStatusElement(id, status, text) {
 // ── Screening ─────────────────────────────────────────────────────────────
 
 async function submitScreening() {
-    const anonymizedId = document.getElementById('anonymized-id').value.trim();
-    const consent = document.getElementById('consent-verified').checked;
+    const anonymizedIdEl = document.getElementById('anonymized-id');
+    const consentEl = document.getElementById('consent-verified');
+    
+    if (!anonymizedIdEl || !consentEl) {
+        showError('Assessment form not found');
+        return;
+    }
+    
+    const anonymizedId = anonymizedIdEl.value.trim();
+    const consent = consentEl.checked;
     if (!anonymizedId) { showError('Please enter an anonymized identifier'); return; }
     if (!consent) { showError('Consent must be verified'); return; }
 
     const surveyData = {};
-    const phq9 = document.getElementById('phq9-score').value;
-    const gad7 = document.getElementById('gad7-score').value;
-    if (phq9) surveyData.phq9_score = parseInt(phq9);
-    if (gad7) surveyData.gad7_score = parseInt(gad7);
+    const phq9El = document.getElementById('phq9-score');
+    const gad7El = document.getElementById('gad7-score');
+    if (phq9El && phq9El.value) surveyData.phq9_score = parseInt(phq9El.value);
+    if (gad7El && gad7El.value) surveyData.gad7_score = parseInt(gad7El.value);
 
     const wearableData = {};
-    const hr = document.getElementById('avg-heart-rate').value;
-    const sleep = document.getElementById('sleep-hours').value;
-    if (hr) wearableData.avg_heart_rate = parseInt(hr);
-    if (sleep) wearableData.sleep_hours = parseFloat(sleep);
+    const hrEl = document.getElementById('avg-heart-rate');
+    const sleepEl = document.getElementById('sleep-hours');
+    if (hrEl && hrEl.value) wearableData.avg_heart_rate = parseInt(hrEl.value);
+    if (sleepEl && sleepEl.value) wearableData.sleep_hours = parseFloat(sleepEl.value);
 
     const emrData = {};
     const dxEl = document.getElementById('diagnosis-codes');
@@ -436,7 +509,13 @@ async function submitScreening() {
 // ── Batch ─────────────────────────────────────────────────────────────────
 
 async function submitBatchScreening() {
-    const raw = document.getElementById('batch-data').value.trim();
+    const batchDataEl = document.getElementById('batch-data');
+    if (!batchDataEl) {
+        showError('Batch data field not found');
+        return;
+    }
+    
+    const raw = batchDataEl.value.trim();
     if (!raw) { showError('Please enter batch data'); return; }
     let requests;
     try {
@@ -507,10 +586,16 @@ async function submitBatchScreening() {
 
 function displayBatchResults(data) {
     const el = document.getElementById('batch-results');
+    if (!el) {
+        console.error('Batch results element not found');
+        return;
+    }
+    
     el.style.display = 'block';
     
     // Show export section
-    document.getElementById('batch-export-section').style.display = 'block';
+    const exportEl = document.getElementById('batch-export-section');
+    if (exportEl) exportEl.style.display = 'block';
     
     // Store batch results globally for export
     window._lastBatchResults = data;
@@ -577,9 +662,13 @@ function displayBatchResults(data) {
 }
 
 function clearBatchData() {
-    document.getElementById('batch-data').value = '';
-    document.getElementById('batch-results').style.display = 'none';
-    document.getElementById('batch-export-section').style.display = 'none';
+    const batchDataEl = document.getElementById('batch-data');
+    const batchResultsEl = document.getElementById('batch-results');
+    const batchExportEl = document.getElementById('batch-export-section');
+    
+    if (batchDataEl) batchDataEl.value = '';
+    if (batchResultsEl) batchResultsEl.style.display = 'none';
+    if (batchExportEl) batchExportEl.style.display = 'none';
     showSuccess('Batch data cleared');
 }
 
@@ -628,15 +717,25 @@ function downloadFile(content, filename, contentType) {
 
 function displayResults(data) {
     const sec = document.getElementById('results-section');
+    if (!sec) {
+        console.error('Results section element not found');
+        return;
+    }
+    
     sec.style.display = 'block';
     sec.scrollIntoView({ behavior: 'smooth' });
 
     const rs = data.risk_score;
-    document.getElementById('score-value').textContent = rs.score.toFixed(1);
-    document.getElementById('confidence-value').textContent = (rs.confidence * 100).toFixed(1);
-    const badge = document.getElementById('risk-badge');
-    badge.textContent = rs.risk_level;
-    badge.className = `risk-badge ${rs.risk_level}`;
+    const scoreEl = document.getElementById('score-value');
+    const confidenceEl = document.getElementById('confidence-value');
+    const badgeEl = document.getElementById('risk-badge');
+    
+    if (scoreEl) scoreEl.textContent = rs.score.toFixed(1);
+    if (confidenceEl) confidenceEl.textContent = (rs.confidence * 100).toFixed(1);
+    if (badgeEl) {
+        badgeEl.textContent = rs.risk_level;
+        badgeEl.className = `risk-badge ${rs.risk_level}`;
+    }
 
     // Tier 1: gauge + force plot
     const contribs = {};
@@ -722,17 +821,44 @@ function displayResults(data) {
 // ── Sample data ───────────────────────────────────────────────────────────
 
 function loadSampleScreeningData() {
-    document.getElementById('anonymized-id').value = 'demo_patient_sample';
-    document.getElementById('consent-verified').checked = true;
-    document.getElementById('phq9-score').value = '15';
-    document.getElementById('gad7-score').value = '12';
-    document.getElementById('sleep-hours').value = '5.5';
-    document.getElementById('avg-heart-rate').value = '78';
-    showSuccess('Sample data loaded!');
+    const elements = {
+        'anonymized-id': 'demo_patient_sample',
+        'phq9-score': '15',
+        'gad7-score': '12',
+        'sleep-hours': '5.5',
+        'avg-heart-rate': '78'
+    };
+    
+    let loaded = false;
+    for (const [id, value] of Object.entries(elements)) {
+        const el = document.getElementById(id);
+        if (el) {
+            el.value = value;
+            loaded = true;
+        }
+    }
+    
+    const consentEl = document.getElementById('consent-verified');
+    if (consentEl) {
+        consentEl.checked = true;
+        loaded = true;
+    }
+    
+    if (loaded) {
+        showSuccess('Sample data loaded!');
+    } else {
+        showError('Form fields not found');
+    }
 }
 
 function loadSampleBatchData() {
-    document.getElementById('batch-data').value = JSON.stringify([
+    const batchDataEl = document.getElementById('batch-data');
+    if (!batchDataEl) {
+        showError('Batch data field not found');
+        return;
+    }
+    
+    batchDataEl.value = JSON.stringify([
         { anonymized_id: "demo_001", consent_verified: true, survey_data: { phq9_score: 18, gad7_score: 14 }, wearable_data: { sleep_hours: 4.5, avg_heart_rate: 82 } },
         { anonymized_id: "demo_002", consent_verified: true, survey_data: { phq9_score: 8, gad7_score: 6 }, wearable_data: { sleep_hours: 7, avg_heart_rate: 68 } },
         { anonymized_id: "demo_003", consent_verified: true, survey_data: { phq9_score: 22, gad7_score: 18 }, wearable_data: { sleep_hours: 3.5, avg_heart_rate: 95 } },
@@ -1092,10 +1218,3 @@ function renderTrend(container, anonymizedId) {
             ${history.map((h, i) => `<circle class="trend-dot" cx="${x(i)}" cy="${y(h.score)}" r="3.5" fill="${levelColor(h.level)}"/>`).join('')}
         </svg>`;
 }
-
-// ── Utilities ─────────────────────────────────────────────────────────────
-function showError(msg) { const e = document.getElementById('error-display'); e.textContent = msg; e.style.display = 'block'; e.className = 'error-message'; e.scrollIntoView({ behavior: 'smooth' }); }
-function hideError() { document.getElementById('error-display').style.display = 'none'; }
-function hideResults() { document.getElementById('results-section').style.display = 'none'; }
-function showSuccess(msg) { const e = document.getElementById('error-display'); e.className = 'success-message'; e.textContent = msg; e.style.display = 'block'; setTimeout(() => { e.style.display = 'none'; }, 3000); }
-function showLoading(show) { document.getElementById('loading').style.display = show ? 'block' : 'none'; }
