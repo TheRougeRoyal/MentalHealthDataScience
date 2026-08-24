@@ -1,0 +1,102 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Button Test</title>
+</head>
+<body>
+    <h1>Button Click Test</h1>
+    
+    <input type="text" id="anonymized-id" placeholder="ID">
+    <input type="checkbox" id="consent-verified">
+    <input type="number" id="phq9-score" placeholder="PHQ9">
+    <input type="number" id="gad7-score" placeholder="GAD7">
+    <input type="number" id="sleep-hours" placeholder="Sleep">
+    <input type="number" id="avg-heart-rate" placeholder="HR">
+    
+    <button onclick="testClick()" class="btn btn-primary">Test Button</button>
+    <button onclick="submitScreening()" class="btn btn-primary">Run Assessment</button>
+    
+    <div id="error-display" style="display:none; color: red;"></div>
+    <div id="loading" style="display:none;">Loading...</div>
+    <div id="results-section" style="display:none;">Results</div>
+    
+    <script>
+        // Simple test
+        function testClick() {
+            alert('Button clicked successfully!');
+            console.log('Test button works');
+        }
+        
+        // Copy minimal version of functions needed
+        function showError(msg) { 
+            const e = document.getElementById('error-display'); 
+            e.textContent = msg; 
+            e.style.display = 'block'; 
+            console.error('Error:', msg);
+        }
+        
+        function showLoading(show) { 
+            document.getElementById('loading').style.display = show ? 'block' : 'none'; 
+        }
+        
+        function hideError() { 
+            document.getElementById('error-display').style.display = 'none'; 
+        }
+        
+        function hideResults() { 
+            document.getElementById('results-section').style.display = 'none'; 
+        }
+        
+        function showSuccess(msg) {
+            alert(msg);
+            console.log('Success:', msg);
+        }
+        
+        // Simple scoring function
+        function clientScore(data) {
+            const score = ((data.phq9_score || 0) * 2) + ((data.gad7_score || 0) * 2);
+            return {
+                risk_score: score,
+                risk_level: score > 60 ? 'high' : score > 30 ? 'moderate' : 'low',
+                contributions: {}
+            };
+        }
+        
+        // Test version of submitScreening
+        async function submitScreening() {
+            console.log('submitScreening called!');
+            
+            const anonymizedId = document.getElementById('anonymized-id').value.trim();
+            const consent = document.getElementById('consent-verified').checked;
+            
+            if (!anonymizedId) { 
+                showError('Please enter an anonymized identifier'); 
+                return; 
+            }
+            if (!consent) { 
+                showError('Consent must be verified'); 
+                return; 
+            }
+            
+            const surveyData = {};
+            const phq9 = document.getElementById('phq9-score').value;
+            const gad7 = document.getElementById('gad7-score').value;
+            if (phq9) surveyData.phq9_score = parseInt(phq9);
+            if (gad7) surveyData.gad7_score = parseInt(gad7);
+            
+            console.log('Survey data:', surveyData);
+            
+            showLoading(true);
+            hideError();
+            hideResults();
+            
+            setTimeout(() => {
+                showLoading(false);
+                showSuccess('Test assessment complete! Score: ' + JSON.stringify(clientScore(surveyData)));
+            }, 1000);
+        }
+        
+        console.log('Script loaded successfully');
+    </script>
+</body>
+</html>
