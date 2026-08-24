@@ -23,6 +23,7 @@
     { "src": "/docs", "dest": "/frontend/docs.html" },
     { "src": "/api(?:/(.*))?", "dest": "api/index.py" },
     { "src": "/app.js", "dest": "/frontend/app.js" },
+    { "src": "/partials/chrome.js", "dest": "/frontend/partials/chrome.js" },
     { "src": "/styles.css", "dest": "/frontend/styles.css" },
     { "src": "/legal.css", "dest": "/frontend/legal.css" },
     { "src": "/profile.html", "dest": "/frontend/profile.html" },
