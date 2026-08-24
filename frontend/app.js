@@ -155,6 +155,7 @@ if (_fbConfigured) {
 
 let _fbUser = null;
 let _firebaseInitPromise = null;
+let _redirectAfterLogin = false;
 
 // ── Token management ───────────────────────────────────────────────────────
 
@@ -1422,8 +1423,8 @@ function renderTrend(container, anonymizedId) {
 }
 
 // ── Utilities ─────────────────────────────────────────────────────────────
-function showError(msg) { const e = document.getElementById('error-display'); e.textContent = msg; e.style.display = 'block'; e.className = 'error-message'; e.scrollIntoView({ behavior: 'smooth' }); }
-function hideError() { document.getElementById('error-display').style.display = 'none'; }
+function showError(msg) { const e = document.getElementById('error-display'); if (!e) return; e.textContent = msg; e.style.display = 'block'; e.className = 'error-message'; e.scrollIntoView({ behavior: 'smooth' }); }
+function hideError() { const e = document.getElementById('error-display'); if (e) e.style.display = 'none'; }
 function hideResults() { document.getElementById('results-section').style.display = 'none'; }
 function showSuccess(msg) { const e = document.getElementById('error-display'); e.className = 'success-message'; e.textContent = msg; e.style.display = 'block'; setTimeout(() => { e.style.display = 'none'; }, 3000); }
-function showLoading(show) { document.getElementById('loading').style.display = show ? 'block' : 'none'; }
+function showLoading(show) { const e = document.getElementById('loading'); if (e) e.style.display = show ? 'block' : 'none'; }
