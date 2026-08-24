@@ -53,6 +53,7 @@ class MLConfig(BaseSettings):
     ollama_model: str = Field(default="llama3", description="Ollama model name")
     ollama_api_key: str = Field(default="", description="Ollama API key (for cloud-hosted instances)")
     ollama_timeout: int = Field(default=30, description="Ollama request timeout in seconds")
+    model_version: str = Field(default="clinical-rules-2.0.0", description="Version of the deployed risk model")
 
     model_config = SettingsConfigDict(
         env_prefix="ML_",
@@ -84,6 +85,7 @@ class SecurityConfig(BaseSettings):
     jwt_algorithm: str = Field(default="HS256", description="JWT algorithm")
     jwt_expiry_hours: int = Field(default=24, description="JWT expiry in hours")
     anonymization_salt: str = Field(default="", description="Salt for anonymization (required)")
+    data_encryption_key: str = Field(default="", description="Fernet key for encrypted clinical data")
 
     model_config = SettingsConfigDict(
         env_prefix="SECURITY_",
@@ -107,6 +109,7 @@ class GovernanceConfig(BaseSettings):
     """Governance configuration"""
     
     audit_log_retention_days: int = Field(default=90, description="Audit log retention in days")
+    screening_retention_days: int = Field(default=90, description="Screening data retention in days")
     human_review_threshold: float = Field(default=75.0, description="Risk score threshold for human review")
     review_escalation_hours: int = Field(default=4, description="Hours before review escalation")
     drift_threshold: float = Field(default=0.3, description="Drift detection threshold")

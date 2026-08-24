@@ -1,0 +1,232 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Mental Health Data Science | Profile</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="styles.css">
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='8' fill='%230c1417'/><path d='M5 16h4l3-8 4 16 3-8h8' fill='none' stroke='%232dd4bf' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round'/></svg>">
+</head>
+<body class="dark" data-page="profile">
+    <div class="mobile-nav-bar">
+        <div class="mobile-brand">MindMetrics</div>
+        <button class="mobile-menu-btn" id="mobile-menu-btn" onclick="toggleMobileMenu()" aria-label="Open menu" aria-expanded="false">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 7h16M4 12h16M4 17h16"/></svg>
+        </button>
+    </div>
+    <div id="mobile-drawer" class="mobile-drawer">
+        <a href="index.html" onclick="toggleMobileMenu()" class="nav-item"><svg class="nav-icon" viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="9" rx="1"/><rect x="14" y="3" width="7" height="5" rx="1"/><rect x="14" y="12" width="7" height="9" rx="1"/><rect x="3" y="16" width="7" height="5" rx="1"/></svg><span class="nav-text">Dashboard</span></a>
+        <a href="screening.html" onclick="toggleMobileMenu()" class="nav-item"><svg class="nav-icon" viewBox="0 0 24 24"><path d="M9 5H7a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-2"/><rect x="9" y="3" width="6" height="4" rx="1"/><path d="M9 12h6M9 16h4"/></svg><span class="nav-text">Screening Tool</span></a>
+        <a href="batch.html" onclick="toggleMobileMenu()" class="nav-item"><svg class="nav-icon" viewBox="0 0 24 24"><polygon points="12 2 2 7 12 12 22 7 12 2"/><polyline points="2 17 12 22 22 17"/><polyline points="2 12 12 17 22 12"/></svg><span class="nav-text">Batch Analytics</span></a>
+        <a href="statistics.html" onclick="toggleMobileMenu()" class="nav-item"><svg class="nav-icon" viewBox="0 0 24 24"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg><span class="nav-text">Statistical Analysis</span></a>
+        <a href="queue.html" onclick="toggleMobileMenu()" class="nav-item" data-admin-only><svg class="nav-icon" viewBox="0 0 24 24"><polyline points="22 12 16 12 14 15 10 15 8 12 2 12"/><path d="M5.45 5.11 2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z"/></svg><span class="nav-text">Review Queue</span></a>
+        <a href="profile.html" onclick="toggleMobileMenu()" class="nav-item active"><svg class="nav-icon" viewBox="0 0 24 24"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg><span class="nav-text">Profile</span></a>
+        <button onclick="toggleTheme()" class="btn btn-secondary" style="margin-top:auto;">Toggle Theme</button>
+    </div>
+
+    <div class="app-wrapper" id="app-wrapper">
+        <aside class="app-sidebar">
+            <div class="sidebar-brand">
+                <div class="sidebar-brand-inner">
+                    <div class="brand-mark" aria-hidden="true">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12h3l2.5-7 3 14 2.5-7H21"/></svg>
+                    </div>
+                    <div class="brand-text">
+                        <div class="brand-title">MindMetrics</div>
+                        <div class="brand-subtitle">Risk Data Science</div>
+                    </div>
+                </div>
+            </div>
+            <nav class="sidebar-nav" aria-label="Primary">
+                <a href="index.html" class="nav-item" title="Dashboard"><svg class="nav-icon" viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="9" rx="1"/><rect x="14" y="3" width="7" height="5" rx="1"/><rect x="14" y="12" width="7" height="9" rx="1"/><rect x="3" y="16" width="7" height="5" rx="1"/></svg><span class="nav-text">Dashboard</span></a>
+                <a href="screening.html" class="nav-item" title="Screening Tool"><svg class="nav-icon" viewBox="0 0 24 24"><path d="M9 5H7a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-2"/><rect x="9" y="3" width="6" height="4" rx="1"/><path d="M9 12h6M9 16h4"/></svg><span class="nav-text">Screening Tool</span></a>
+                <a href="batch.html" class="nav-item" title="Batch Analytics"><svg class="nav-icon" viewBox="0 0 24 24"><polygon points="12 2 2 7 12 12 22 7 12 2"/><polyline points="2 17 12 22 22 17"/><polyline points="2 12 12 17 22 12"/></svg><span class="nav-text">Batch Analytics</span></a>
+                <a href="statistics.html" class="nav-item" title="Statistical Analysis"><svg class="nav-icon" viewBox="0 0 24 24"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg><span class="nav-text">Statistical Analysis</span></a>
+                <a href="queue.html" class="nav-item" title="Review Queue" data-admin-only><svg class="nav-icon" viewBox="0 0 24 24"><polyline points="22 12 16 12 14 15 10 15 8 12 2 12"/><path d="M5.45 5.11 2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z"/></svg><span class="nav-text">Review Queue</span></a>
+                <a href="profile.html" class="nav-item active" title="Profile"><svg class="nav-icon" viewBox="0 0 24 24"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg><span class="nav-text">Profile</span></a>
+            </nav>
+            <div class="sidebar-footer">
+                <button class="sidebar-collapse-btn" onclick="toggleSidebar()" title="Collapse sidebar" aria-label="Collapse sidebar">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"/></svg>
+                    <span class="nav-text">Collapse</span>
+                </button>
+            </div>
+        </aside>
+
+        <main class="app-main">
+            <header class="top-header">
+                <div>
+                    <p class="page-kicker">Account</p>
+                    <h1>Your Profile</h1>
+                    <p class="page-lead">Manage your account details, role, and workspace preferences.</p>
+                </div>
+                <div class="header-toolbar">
+                    <div id="user-header-pill" class="user-header-pill" title="View profile">
+                        <img id="user-avatar" src="" alt="Avatar" style="display:none;">
+                        <span id="header-user-name" class="header-user-name">Guest</span>
+                        <span id="user-role-badge" class="badge badge-low">User</span>
+                    </div>
+                    <button id="theme-toggle-btn" onclick="toggleTheme()" class="btn btn-secondary btn-theme" title="Toggle theme">
+                        <svg class="theme-icon" id="theme-toggle-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"></svg>
+                        <span id="theme-toggle-text">Light mode</span>
+                    </button>
+                </div>
+            </header>
+
+            <section id="auth-section" class="card" aria-label="Authentication">
+                <p class="card-kicker">Access</p>
+                <h2>Researcher &amp; Practitioner Login</h2>
+                <div id="error-display" class="error-message" role="alert" style="display:none;"></div>
+                <div id="login-form">
+                    <button onclick="googleSignIn()" class="google-btn" type="button">Continue with Google</button>
+                    <div class="or-divider">or email login</div>
+                    <div class="auth-grid">
+                        <div class="form-group">
+                            <label for="login-email">Account Email</label>
+                            <input type="email" id="login-email" placeholder="user@example.org">
+                        </div>
+                        <div class="form-group">
+                            <label for="login-password">Password</label>
+                            <input type="password" id="login-password" placeholder="••••••••">
+                        </div>
+                    </div>
+                    <div class="btn-row">
+                        <button onclick="firebaseLogin()" class="btn btn-primary">Sign In</button>
+                        <button onclick="firebaseRegister()" class="btn btn-secondary">Create account</button>
+                    </div>
+                </div>
+                <div id="user-info" style="display:none;">
+                    <p class="signed-in-note">Authenticated as <strong id="user-display-name"></strong></p>
+                    <button onclick="firebaseLogout()" class="btn btn-secondary" style="margin-top:12px;">Sign Out</button>
+                </div>
+            </section>
+
+            <div id="profile-content" style="display:none;">
+                <div class="profile-grid">
+                    <section class="card" aria-label="Profile identity">
+                        <p class="card-kicker">Identity</p>
+                        <div class="profile-identity">
+                            <img id="profile-avatar" src="" alt="Profile photo" style="display:none;">
+                            <div id="profile-avatar-fallback" class="avatar-fallback" aria-hidden="true">?</div>
+                            <div>
+                                <h2 id="profile-display-name" style="margin:0; font-size:1.25rem;">—</h2>
+                                <p id="profile-email" class="muted" style="font-size:0.85rem; margin:4px 0 0;">—</p>
+                                <div class="btn-row">
+                                    <span id="profile-role-badge" class="badge badge-low">User</span>
+                                    <span id="profile-provider-badge" class="badge badge-medium">—</span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="stats-overview-grid" style="grid-template-columns: repeat(2, 1fr); margin-bottom:0;">
+                            <div class="stat-card">
+                                <div class="stat-info">
+                                    <div class="stat-label">Screenings</div>
+                                    <div id="profile-stat-screenings" class="stat-value">—</div>
+                                </div>
+                            </div>
+                            <div class="stat-card">
+                                <div class="stat-info">
+                                    <div class="stat-label">High Risk Flagged</div>
+                                    <div id="profile-stat-highrisk" class="stat-value">—</div>
+                                </div>
+                            </div>
+                        </div>
+                    </section>
+
+                    <section class="card" aria-label="Profile details">
+                        <p class="card-kicker">Details</p>
+                        <h2>Profile Details</h2>
+                        <div id="profile-form-error" class="error-message" role="alert" style="display:none;"></div>
+                        <div class="form-group">
+                            <label for="profile-display-name-input">Display Name</label>
+                            <input type="text" id="profile-display-name-input" placeholder="Your full name">
+                        </div>
+                        <div class="form-group">
+                            <label for="profile-job-title">Job Title / Role</label>
+                            <input type="text" id="profile-job-title" placeholder="e.g. Clinical Researcher">
+                        </div>
+                        <div class="form-group">
+                            <label for="profile-organization">Organization / Institution</label>
+                            <input type="text" id="profile-organization" placeholder="e.g. University Hospital">
+                        </div>
+                        <div class="form-group">
+                            <label for="profile-location">Location</label>
+                            <input type="text" id="profile-location" placeholder="e.g. Boston, MA">
+                        </div>
+                        <div class="form-grid">
+                            <div class="form-group">
+                                <label for="profile-phone">Phone</label>
+                                <input type="tel" id="profile-phone" placeholder="+1 (555) 000-0000">
+                            </div>
+                            <div class="form-group">
+                                <label for="profile-website">Website</label>
+                                <input type="url" id="profile-website" placeholder="https://example.org">
+                            </div>
+                        </div>
+                        <div class="form-group">
+                            <label for="profile-bio">Bio</label>
+                            <textarea id="profile-bio" rows="4" placeholder="Tell us about your research focus and clinical interests..."></textarea>
+                            <p class="hint">Max 500 characters</p>
+                        </div>
+                        <button onclick="saveProfile()" class="btn btn-primary">Save Profile</button>
+                    </section>
+                </div>
+
+                <div class="profile-grid" style="margin-top:20px;">
+                    <section id="password-section" class="card" aria-label="Account security" style="display:none;">
+                        <p class="card-kicker">Security</p>
+                        <h2>Change Password</h2>
+                        <div id="password-form-error" class="error-message" role="alert" style="display:none;"></div>
+                        <div class="form-group">
+                            <label for="current-password">Current Password</label>
+                            <input type="password" id="current-password" placeholder="••••••••">
+                        </div>
+                        <div class="form-group">
+                            <label for="new-password">New Password</label>
+                            <input type="password" id="new-password" placeholder="At least 6 characters">
+                        </div>
+                        <div class="form-group">
+                            <label for="confirm-password">Confirm New Password</label>
+                            <input type="password" id="confirm-password" placeholder="••••••••">
+                        </div>
+                        <button onclick="changePassword()" class="btn btn-secondary">Update Password</button>
+                    </section>
+
+                    <section class="card" aria-label="Account actions">
+                        <p class="card-kicker">Workspace</p>
+                        <h2>Account</h2>
+                        <p class="card-lead">Your screening data is isolated to your account. Review our privacy policies for details on data handling.</p>
+                        <div class="btn-row" style="margin-bottom:16px;">
+                            <a href="privacy.html" class="btn btn-secondary">Privacy Policy</a>
+                            <a href="hipaa.html" class="btn btn-secondary">HIPAA Notice</a>
+                            <a href="disclaimer.html" class="btn btn-secondary">Disclaimer</a>
+                        </div>
+                        <button onclick="firebaseLogout()" class="btn btn-secondary">Sign Out</button>
+                    </section>
+                </div>
+            </div>
+
+            <div id="loading" class="empty-hint" style="display:none; text-align:center; padding:40px;">Loading profile...</div>
+
+            <footer class="page-footer">
+                <p>MindMetrics · Clinical decision support, not a medical device.</p>
+                <nav class="footer-links" aria-label="Legal">
+                    <a href="privacy.html">Privacy</a>
+                    <a href="hipaa.html">HIPAA</a>
+                    <a href="disclaimer.html">Disclaimer</a>
+                    <a href="terms.html">Terms</a>
+                </nav>
+            </footer>
+        </main>
+    </div>
+
+    <script src="https://www.gstatic.com/firebasejs/9.6.10/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.6.10/firebase-auth-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.6.10/firebase-firestore-compat.js"></script>
+    <script src="app.js"></script>
+</body>
+</html>

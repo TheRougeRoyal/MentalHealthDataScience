@@ -1,36 +1,6 @@
-const API_BASE_URL = window.location.hostname === 'localhost'
-  ? 'http://localhost:8000'
+const API_BASE_URL = ['localhost', '127.0.0.1'].includes(window.location.hostname)
+    ? `http://${window.location.hostname}:8000`
   : '/api';
-
-// ── Utilities (defined first to avoid hoisting issues) ────────────────────
-function showError(msg) { 
-    const e = document.getElementById('error-display'); 
-    if (!e) { console.error('[showError] element not found:', msg); return; }
-    e.textContent = msg; 
-    e.style.display = 'block'; 
-    e.className = 'error-message'; 
-    e.scrollIntoView({ behavior: 'smooth' }); 
-}
-function hideError() { 
-    const e = document.getElementById('error-display'); 
-    if (e) e.style.display = 'none'; 
-}
-function hideResults() { 
-    const e = document.getElementById('results-section'); 
-    if (e) e.style.display = 'none'; 
-}
-function showSuccess(msg) { 
-    const e = document.getElementById('error-display'); 
-    if (!e) { console.log('[showSuccess]', msg); return; }
-    e.className = 'success-message'; 
-    e.textContent = msg; 
-    e.style.display = 'block'; 
-    setTimeout(() => { e.style.display = 'none'; }, 3000); 
-}
-function showLoading(show) { 
-    const e = document.getElementById('loading'); 
-    if (e) e.style.display = show ? 'block' : 'none'; 
-}
 
 // ── Theme Management (Dark by Default) ─────────────────────────────────────
 function initTheme() {
@@ -38,6 +8,22 @@ function initTheme() {
     document.documentElement.setAttribute('data-theme', savedTheme);
     document.body.className = savedTheme;
     updateThemeToggleUI(savedTheme);
+    restoreSidebar();
+}
+
+function toggleSidebar() {
+    const wrap = document.getElementById('app-wrapper');
+    if (!wrap) return;
+    wrap.classList.toggle('collapsed-sidebar');
+    localStorage.setItem('sidebar-collapsed', wrap.classList.contains('collapsed-sidebar') ? '1' : '0');
+}
+
+function restoreSidebar() {
+    const wrap = document.getElementById('app-wrapper');
+    if (!wrap) return;
+    if (localStorage.getItem('sidebar-collapsed') === '1') {
+        wrap.classList.add('collapsed-sidebar');
+    }
 }
 
 function toggleTheme() {
@@ -55,10 +41,10 @@ function updateThemeToggleUI(theme) {
     if (!btnText || !btnIcon) return;
     
     if (theme === 'light') {
-        btnText.textContent = 'Dark Mode';
+        btnText.textContent = 'Dark mode';
         btnIcon.innerHTML = `<path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path>`;
     } else {
-        btnText.textContent = 'Light Mode';
+        btnText.textContent = 'Light mode';
         btnIcon.innerHTML = `<circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/>`;
     }
 }
@@ -66,10 +52,7 @@ function updateThemeToggleUI(theme) {
 document.addEventListener('DOMContentLoaded', initTheme);
 
 // ── Firebase Auth ──────────────────────────────────────────────────────────
-// ponytail: minimal config — replace with your project's web config.
-// Missing config silently breaks firebase.auth() with a TDZ error
-// ("Cannot access 'auth' before initialization"), so keep this block.
-const _fbConfig = {
+const _inlineFbConfig = {
     apiKey: window.FIREBASE_API_KEY,
     authDomain: window.FIREBASE_AUTH_DOMAIN,
     projectId: window.FIREBASE_PROJECT_ID,
@@ -81,11 +64,13 @@ const _fbConfig = {
 const _fbConfigured = !!(window.FIREBASE_API_KEY && window.FIREBASE_AUTH_DOMAIN && window.FIREBASE_PROJECT_ID);
 if (!_fbConfigured) {
     console.error('[firebase] Web SDK not configured. Set window.FIREBASE_API_KEY / FIREBASE_AUTH_DOMAIN / FIREBASE_PROJECT_ID before app.js loads. See index.html comments.');
+    showError('Sign-in is not configured for this deployment. Set Firebase web config in index.html.');
 }
 try {
     if (!firebase.apps.length) firebase.initializeApp(_fbConfigured ? _fbConfig : { apiKey: 'invalid' });
 } catch (e) {
     console.error('[firebase] initializeApp failed:', e);
+    showError(`Firebase init failed: ${e.message}`);
 }
 
 const auth = firebase.auth();
@@ -115,92 +100,98 @@ async function authHeaders() {
 // ── Auth UI ────────────────────────────────────────────────────────────────
 
 async function googleSignIn() {
+    if (!(await ensureFirebaseReady())) return;
+    _redirectAfterLogin = true;
     try {
         await auth.signInWithPopup(googleProvider);
-        // onAuthStateChanged handles the rest
+        redirectToWorkspace();
     } catch (e) {
         if (e.code !== 'auth/popup-closed-by-user') {
             showError(`Google sign-in failed: ${e.message}`);
         }
+        _redirectAfterLogin = false;
     }
 }
 
 async function firebaseLogin() {
-    const emailEl = document.getElementById('login-email');
-    const passwordEl = document.getElementById('login-password');
-    
-    if (!emailEl || !passwordEl) {
-        showError('Login form not found');
-        return;
-    }
-    
-    const email = emailEl.value.trim();
-    const password = passwordEl.value.trim();
+    const email = document.getElementById('login-email').value.trim();
+    const password = document.getElementById('login-password').value.trim();
     if (!email || !password) { showError('Please enter email and password'); return; }
 
+    _redirectAfterLogin = true;
     try {
         await auth.signInWithEmailAndPassword(email, password);
+        redirectToWorkspace();
     } catch (e) {
         showError(`Login failed: ${e.message}`);
+        _redirectAfterLogin = false;
     }
 }
 
 async function firebaseRegister() {
-    const emailEl = document.getElementById('login-email');
-    const passwordEl = document.getElementById('login-password');
-    
-    if (!emailEl || !passwordEl) {
-        showError('Registration form not found');
-        return;
-    }
-    
-    const email = emailEl.value.trim();
-    const password = passwordEl.value.trim();
+    const email = document.getElementById('login-email').value.trim();
+    const password = document.getElementById('login-password').value.trim();
     if (!email || !password) { showError('Please enter email and password'); return; }
     if (password.length < 6) { showError('Password must be at least 6 characters'); return; }
 
+    _redirectAfterLogin = true;
     try {
         const cred = await auth.createUserWithEmailAndPassword(email, password);
         // Set display name to the part before @
         await cred.user.updateProfile({ displayName: email.split('@')[0] });
+        redirectToWorkspace();
         showSuccess('Account created! You are now signed in.');
     } catch (e) {
         showError(`Registration failed: ${e.message}`);
+        _redirectAfterLogin = false;
     }
 }
 
 async function firebaseLogout() {
+    if (!(await ensureFirebaseReady())) return;
     try {
         await auth.signOut();
     } catch (_) {}
     _fbUser = null;
-    const loginForm = document.getElementById('login-form');
-    const userInfo = document.getElementById('user-info');
-    const userAvatar = document.getElementById('user-avatar');
-    if (loginForm) loginForm.style.display = '';
-    if (userInfo) userInfo.style.display = 'none';
-    if (userAvatar) userAvatar.style.display = 'none';
+    document.getElementById('login-form').style.display = '';
+    document.getElementById('user-info').style.display = 'none';
+    document.getElementById('user-avatar').style.display = 'none';
     showSuccess('Signed out');
 }
 
 function showAuthState(user) {
-    const loginForm = document.getElementById('login-form');
-    const userInfo = document.getElementById('user-info');
-    if (loginForm) loginForm.style.display = 'none';
-    if (userInfo) userInfo.style.display = '';
+    document.getElementById('login-form').style.display = 'none';
+    document.getElementById('user-info').style.display = '';
 
-    // Show avatar if available (Google users have photoURL)
+    // Reveal the workspace navigation section after login
+    const workspaceOptions = document.getElementById('workspace-options');
+    if (workspaceOptions) workspaceOptions.style.display = '';
+
+    const headerPill = document.getElementById('user-header-pill');
+    if (headerPill) {
+        headerPill.style.display = 'flex';
+        headerPill.style.cursor = 'pointer';
+        headerPill.title = 'View profile';
+        headerPill.onclick = () => navigateToWorkspace('profile.html');
+    }
+
+    // Show avatar if available
     const avatar = document.getElementById('user-avatar');
-    if (avatar && user.photoURL) {
+    if (user.photoURL) {
         avatar.src = user.photoURL;
         avatar.alt = user.displayName || user.email || '';
         avatar.style.display = '';
-    } else if (avatar) {
+    } else {
         avatar.style.display = 'none';
     }
 
-    // Fetch role from backend
-    fetchMe();
+    const displayName = user.displayName || (user.email ? user.email.split('@')[0] : user.uid);
+    const headerName = document.getElementById('header-user-name');
+    if (headerName) headerName.textContent = displayName;
+
+    await fetchMe();
+
+    if (window._pageScope === 'profile') loadProfilePage();
 }
 
 async function fetchMe() {
@@ -208,71 +199,204 @@ async function fetchMe() {
         const r = await fetch(`${API_BASE_URL}/auth/me`, { headers: await authHeaders() });
         if (r.ok) {
             const u = await r.json();
+            // ponytail: role is the only thing that drives UI gating — cache it.
+            window._currentRole = u.role || 'user';
             const badge = document.getElementById('user-role-badge');
-            const displayName = document.getElementById('user-display-name');
-            
-            if (badge) {
-                badge.textContent = u.role;
-                badge.className = `risk-badge ${u.role === 'admin' ? 'moderate' : 'low'}`;
-            }
-            if (displayName) {
-                displayName.textContent = u.display_name || u.email || u.uid;
-            }
+            badge.textContent = u.role;
+            badge.className = `risk-badge ${u.role === 'admin' ? 'moderate' : 'low'}`;
+            document.getElementById('user-display-name').textContent = u.display_name || u.email || u.uid;
 
             // Update avatar if backend has a photo_url
             if (u.photo_url) {
                 const avatar = document.getElementById('user-avatar');
-                if (avatar) {
-                    avatar.src = u.photo_url;
-                    avatar.style.display = '';
-                }
+                avatar.src = u.photo_url;
+                avatar.style.display = '';
             }
         }
     } catch (_) {}
 }
 
+// ── Role-aware UI gating ───────────────────────────────────────────────────
+// Strict isolation between users and admins. Server-side rules are the source
+// of truth; this is purely to keep the right controls in front of the right
+// person so a user never *sees* a patient list they can't read.
+function applyRoleGating(role) {
+    const isAdmin = role === 'admin';
+
+    // Hide admin-only sections by ID prefix.
+    ['review-section', 'admin-section', 'patient-list-section'].forEach((id) => {
+        const el = document.getElementById(id);
+        if (el) el.style.display = isAdmin ? '' : 'none';
+    });
+
+    // Hide admin nav links.
+    document.querySelectorAll('[data-admin-only]').forEach((el) => {
+        el.style.display = isAdmin ? '' : 'none';
+    });
+
+    // For non-admins, the statistics panel must clearly say "your data only".
+    const statsScope = document.getElementById('statistics-scope-note');
+    if (statsScope) statsScope.textContent = isAdmin
+        ? 'Showing aggregate statistics across all patients.'
+        : 'Showing your screening history only. Other patients\' data is not accessible.';
+
+    // Clear any pre-loaded admin data from the DOM if a non-admin just signed in.
+    if (!isAdmin) {
+        const q = document.getElementById('review-queue-list');
+        if (q) q.innerHTML = '<p class="empty-hint">Review queue is admin-only.</p>';
+    }
+}
+
 // ── Init ──────────────────────────────────────────────────────────────────
 
 window.addEventListener('DOMContentLoaded', () => {
-    // Show any Firebase configuration errors now that DOM is ready
-    if (!_fbConfigured) {
-        showError('Sign-in is not configured for this deployment. Set Firebase web config in index.html.');
-    }
-    
     checkSystemStatus();
-    initSimulator();
+    if (window._pageScope === 'dashboard') initDashboardNavigation();
+    if (window._pageScope === 'screening') initSimulator();
+    if (window._pageScope === 'profile') initProfile();
+    initializeFirebaseAuth();
+});
 
-    // ── Firebase self-check (ponytail: minimal regression guard) ──────────
-    // If this throws or _fbConfigured is false, we already showed an error above.
-    // Belt-and-suspenders: assert the auth handle is callable.
-    if (!_fbConfigured) return;
+function initializeFirebaseAuth() {
+    _firebaseInitPromise = initializeFirebaseAuthInternal();
+    return _firebaseInitPromise;
+}
+
+async function ensureFirebaseReady() {
+    if (_firebaseInitPromise) await _firebaseInitPromise;
+    if (auth && googleProvider) return true;
+    showError('Sign-in is unavailable. Configure the Firebase web settings, then reload this page.');
+    return false;
+}
+
+async function initializeFirebaseAuthInternal() {
+    let config = _inlineFbConfig;
+    if (!config.apiKey || !config.authDomain || !config.projectId) {
+        try {
+            const response = await fetch(`${API_BASE_URL}/auth/config`);
+            if (response.ok) config = await response.json();
+        } catch (_) {}
+    }
+
+    _fbConfigured = !!(config.apiKey && config.authDomain && config.projectId);
+    if (!_fbConfigured) {
+        showError('Sign-in is not configured. Set FIREBASE_API_KEY, FIREBASE_AUTH_DOMAIN, FIREBASE_PROJECT_ID, FIREBASE_MESSAGING_SENDER_ID, and FIREBASE_APP_ID in the deployment environment.');
+        return;
+    }
+
     try {
-        // signOut() is a no-op when signed-out but proves the handle is wired.
-        auth.signOut().catch(() => {});
+        if (!firebase.apps.length) firebase.initializeApp(config);
+        auth = firebase.auth();
+        await auth.setPersistence(firebase.auth.Auth.Persistence.LOCAL);
+        db = firebase.firestore ? firebase.firestore() : null;
+        googleProvider = new firebase.auth.GoogleAuthProvider();
+        googleProvider.setCustomParameters({ prompt: 'select_account' });
     } catch (e) {
-        console.error('[firebase] self-check failed:', e);
-        showError(`Firebase auth unavailable: ${e.message}`);
+        console.error('[firebase] initializeApp failed:', e);
+        showError(`Firebase init failed: ${e.message}`);
         return;
     }
 
     auth.onAuthStateChanged(async (user) => {
+        window._authReady = true;
         if (user) {
             _fbUser = user;
             // Refresh token on auth state change to keep it fresh
             try { await user.getIdToken(true); } catch (_) {}
-            showAuthState(user);
+            await showAuthState(user);
             checkSystemStatus();
+            if (_redirectAfterLogin) {
+                _redirectAfterLogin = false;
+                redirectToWorkspace();
+            }
         } else {
             _fbUser = null;
-            const loginForm = document.getElementById('login-form');
-            const userInfo = document.getElementById('user-info');
-            const userAvatar = document.getElementById('user-avatar');
-            if (loginForm) loginForm.style.display = '';
-            if (userInfo) userInfo.style.display = 'none';
-            if (userAvatar) userAvatar.style.display = 'none';
+            document.getElementById('login-form').style.display = '';
+            document.getElementById('user-info').style.display = 'none';
+            document.getElementById('user-avatar').style.display = 'none';
         }
     });
-});
+}
+
+function requireSignedIn() {
+    if (_fbUser) return true;
+    showError('Please sign in before using this workspace.');
+    return false;
+}
+
+function navigateToWorkspace(dest) {
+    // If not signed in yet, block navigation and prompt sign-in
+    if (!_fbUser) {
+        sessionStorage.setItem('_postLoginDest', dest);
+        showError('Please sign in to access this workspace.');
+        document.getElementById('login-email')?.focus();
+        return false; // prevent <a> default navigation
+    }
+    // Signed in — navigate directly
+    window.location.href = dest;
+    return false;
+}
+
+function redirectToWorkspace() {
+    // ponytail: after login, land on the workspace the user came here to do.
+    // Check if a specific destination was stored before login.
+    const dest = sessionStorage.getItem('_postLoginDest') || 'screening.html';
+    sessionStorage.removeItem('_postLoginDest');
+    window.location.href = dest;
+}
+
+function toggleMobileMenu() {
+    const drawer = document.getElementById('mobile-drawer');
+    if (!drawer) return;
+    const open = drawer.classList.toggle('open');
+    const btn = document.getElementById('mobile-menu-btn');
+    if (btn) {
+        btn.setAttribute('aria-expanded', open ? 'true' : 'false');
+        btn.setAttribute('aria-label', open ? 'Close menu' : 'Open menu');
+    }
+}
+
+function initDashboardNavigation() {
+    const links = [...document.querySelectorAll('.sidebar-nav a[href^="#"], .mobile-drawer a[href^="#"]')];
+    const sections = links
+        .map(link => document.querySelector(link.getAttribute('href')))
+        .filter((section, index, all) => section && all.indexOf(section) === index);
+
+    const setActiveLink = (sectionId) => {
+        links.forEach(link => {
+            link.classList.toggle('active', link.getAttribute('href') === `#${sectionId}`);
+        });
+    };
+
+    links.forEach(link => {
+        link.addEventListener('click', (event) => {
+            const targetId = link.getAttribute('href')?.slice(1);
+            const target = targetId ? document.getElementById(targetId) : null;
+            if (!target) return;
+
+            if (link.hasAttribute('data-admin-only') && window._currentRole !== 'admin') {
+                event.preventDefault();
+                showError('The review queue is available to administrators only.');
+                return;
+            }
+
+            event.preventDefault();
+            target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            setActiveLink(targetId);
+            document.getElementById('mobile-drawer')?.classList.remove('open');
+        });
+    });
+
+    if ('IntersectionObserver' in window && sections.length) {
+        const observer = new IntersectionObserver((entries) => {
+            const visible = entries
+                .filter(entry => entry.isIntersecting)
+                .sort((a, b) => b.intersectionRatio - a.intersectionRatio)[0];
+            if (visible) setActiveLink(visible.target.id);
+        }, { rootMargin: '-18% 0px -65% 0px', threshold: [0, 0.25, 0.5, 1] });
+        sections.forEach(section => observer.observe(section));
+    }
+}
 
 // ── Status ────────────────────────────────────────────────────────────────
 
@@ -398,20 +522,61 @@ function renderStatistics(data) {
     const target = document.getElementById('statistics-analysis');
     if (!target) return;
 
+    const total = stats.total || 0;
+    const lowCount = distribution.low || 0;
+    const modCount = distribution.moderate || 0;
+    const highCount = (distribution.high || 0) + (distribution.critical || 0);
+
+    const lowPct = total ? ((lowCount / total) * 100).toFixed(1) : 0;
+    const modPct = total ? ((modCount / total) * 100).toFixed(1) : 0;
+    const highPct = total ? ((highCount / total) * 100).toFixed(1) : 0;
+
     target.innerHTML = `
-        <div class="analysis-grid">
-            <div><span class="stat-label">Average score</span><strong>${Number(stats.avg_risk_score || 0).toFixed(1)}</strong></div>
-            <div><span class="stat-label">Median score</span><strong>${Number(stats.median_risk_score || 0).toFixed(1)}</strong></div>
-            <div><span class="stat-label">Score range</span><strong>${Number(stats.min_risk_score || 0).toFixed(1)} - ${Number(stats.max_risk_score || 0).toFixed(1)}</strong></div>
-            <div><span class="stat-label">Risk groups</span><strong>${distribution.low || 0} low / ${distribution.moderate || 0} moderate / ${(distribution.high || 0) + (distribution.critical || 0)} high+</strong></div>
+        <div class="analysis-grid" style="margin-bottom: 20px;">
+            <div>
+                <span class="stat-label">Mean Risk Score</span>
+                <strong>${Number(stats.avg_risk_score || 0).toFixed(1)} <span class="hint">/ 100</span></strong>
+            </div>
+            <div>
+                <span class="stat-label">Median (IQR)</span>
+                <strong>${Number(stats.median_risk_score || 0).toFixed(1)} <span class="hint">score</span></strong>
+            </div>
+            <div>
+                <span class="stat-label">Min / Max Range</span>
+                <strong>${Number(stats.min_risk_score || 0).toFixed(1)} - ${Number(stats.max_risk_score || 0).toFixed(1)}</strong>
+            </div>
+            <div>
+                <span class="stat-label">Critical / High Prevalence</span>
+                <strong style="color:${highCount > 0 ? 'var(--status-danger)' : 'var(--text-main)'};">${stats.high_risk_count || 0} <span class="hint">(${(stats.high_risk_pct || 0).toFixed(1)}%)</span></strong>
+            </div>
         </div>
-        <div style="margin-top: 20px; padding: 16px; background: var(--bg-input); border-radius: var(--radius-input); border-left: 3px solid var(--brand-accent);">
-            <h4 style="margin: 0 0 8px 0; font-size: 0.95rem;">Dataset Information</h4>
-            <p style="margin: 0; font-size: 0.85rem; color: var(--text-muted);">
-                Statistical analysis based on ${stats.total || 0} anonymized screening records. 
-                High-risk cases (${stats.high_risk_count || 0} records, ${(stats.high_risk_pct || 0).toFixed(1)}%) 
-                are flagged for clinical review. Data refreshed from UI pipeline.
-            </p>
+
+        <div class="strat-card">
+            <div class="section-toolbar" style="margin-bottom: 10px;">
+                <h4 class="panel-label" style="margin:0;">Population Risk Stratification</h4>
+                <span class="muted" style="font-size: 0.8125rem;">N = ${total} records</span>
+            </div>
+            
+            <div class="strat-bar">
+                <div style="width: ${lowPct}%; background: var(--status-success);" title="Low Risk: ${lowCount} (${lowPct}%)"></div>
+                <div style="width: ${modPct}%; background: var(--status-warning);" title="Moderate Risk: ${modCount} (${modPct}%)"></div>
+                <div style="width: ${highPct}%; background: var(--status-danger);" title="High Risk: ${highCount} (${highPct}%)"></div>
+            </div>
+
+            <div class="legend-row">
+                <div class="legend-item">
+                    <span class="swatch swatch-low"></span>
+                    <span>Low Risk: <strong>${lowCount}</strong> (${lowPct}%)</span>
+                </div>
+                <div class="legend-item">
+                    <span class="swatch swatch-mod"></span>
+                    <span>Moderate: <strong>${modCount}</strong> (${modPct}%)</span>
+                </div>
+                <div class="legend-item">
+                    <span class="swatch swatch-high"></span>
+                    <span>High+: <strong>${highCount}</strong> (${highPct}%)</span>
+                </div>
+            </div>
         </div>`;
 }
 
@@ -423,16 +588,8 @@ function updateStatusElement(id, status, text) {
 // ── Screening ─────────────────────────────────────────────────────────────
 
 async function submitScreening() {
-    const anonymizedIdEl = document.getElementById('anonymized-id');
-    const consentEl = document.getElementById('consent-verified');
-    
-    if (!anonymizedIdEl || !consentEl) {
-        showError('Assessment form not found');
-        return;
-    }
-    
-    const anonymizedId = anonymizedIdEl.value.trim();
-    const consent = consentEl.checked;
+    const anonymizedId = document.getElementById('anonymized-id').value.trim();
+    const consent = document.getElementById('consent-verified').checked;
     if (!anonymizedId) { showError('Please enter an anonymized identifier'); return; }
     if (!consent) { showError('Consent must be verified'); return; }
 
@@ -468,40 +625,13 @@ async function submitScreening() {
     showLoading(true); hideError(); hideResults();
     try {
         const r = await fetch(`${API_BASE_URL}/screen`, { method: 'POST', headers: await authHeaders(), body: JSON.stringify(payload) });
-        if (!r.ok) { const e = await r.json(); throw new Error(e.detail || `HTTP ${r.status}`); }
+        if (!r.ok) {
+            const e = await r.json().catch(() => ({}));
+            throw new Error(e.detail || e.message || `HTTP ${r.status}`);
+        }
         displayResults(await r.json());
     } catch (e) {
-        if (e.message.includes('Failed to fetch')) {
-            const combined = { ...surveyData, ...wearableData, ...emrData };
-            const calc = clientScore(combined);
-            const factorStrings = Object.entries(calc.contributions).map(([k, v]) => {
-                const label = FEATURE_WEIGHTS[k]?.label || k;
-                return `${label}: elevated severity contribution (${(v * 100).toFixed(0)}%)`;
-            });
-            displayResults({
-                risk_score: {
-                    anonymized_id: anonymizedId,
-                    score: calc.risk_score,
-                    risk_level: calc.risk_level,
-                    confidence: 0.85,
-                    contributing_factors: factorStrings.length ? factorStrings : ["No elevated risk factors detected"],
-                    timestamp: new Date().toISOString()
-                },
-                recommendations: [
-                    { resource_type: "general", name: "Mental Wellness Resources", description: "Standard wellness support materials.", urgency: "routine" }
-                ],
-                explanations: {
-                    top_features: Object.entries(calc.contributions).map(([k, v]) => [k, v]),
-                    counterfactual: "Increasing sleep or reducing stress metrics lowers score.",
-                    clinical_interpretation: "Risk estimated using client-side statistical engine."
-                },
-                requires_human_review: calc.risk_score >= 50,
-                alert_triggered: calc.risk_score >= 70
-            });
-            showSuccess('Statistical risk assessment computed!');
-        } else {
-            showError(`Assessment failed: ${e.message}`);
-        }
+        showError(`Assessment failed: ${e.message}`);
     }
     finally { showLoading(false); }
 }
@@ -509,13 +639,7 @@ async function submitScreening() {
 // ── Batch ─────────────────────────────────────────────────────────────────
 
 async function submitBatchScreening() {
-    const batchDataEl = document.getElementById('batch-data');
-    if (!batchDataEl) {
-        showError('Batch data field not found');
-        return;
-    }
-    
-    const raw = batchDataEl.value.trim();
+    const raw = document.getElementById('batch-data').value.trim();
     if (!raw) { showError('Please enter batch data'); return; }
     let requests;
     try {
@@ -543,7 +667,7 @@ async function submitBatchScreening() {
         });
         if (!r.ok) {
             let msg = `HTTP ${r.status}`;
-            try { const e = await r.json(); msg = e.detail || JSON.stringify(e); } catch (_) {}
+            try { const e = await r.json(); msg = e.detail || e.message || JSON.stringify(e); } catch (_) {}
             throw new Error(msg);
         }
         displayBatchResults(await r.json());
@@ -654,7 +778,7 @@ function displayBatchResults(data) {
             </div>
             <div style="display:flex; gap:8px;">`;
         if (r.alert_triggered) html += `<span class="badge badge-high">🚨 Alert</span>`;
-        if (r.requires_human_review) html += `<span class="badge badge-medium">👤 Review</span>`;
+        if (r.requires_human_review) html += `<span class="badge badge-medium">Review</span>`;
         html += `</div></div>`;
     });
     el.innerHTML = html + '</div>';
@@ -779,8 +903,8 @@ function displayResults(data) {
 
     const alerts = document.getElementById('alerts-display');
     alerts.innerHTML = '';
-    if (data.alert_triggered) alerts.innerHTML = '<div class="alert-box danger"><span>⚠️</span><strong>Alert:</strong> Immediate attention recommended</div>';
-    if (data.requires_human_review) alerts.innerHTML += '<div class="alert-box warning"><span>👤</span><strong>Human Review Required</strong></div>';
+    if (data.alert_triggered) alerts.innerHTML = '<div class="alert-box danger"><strong>Alert:</strong> Immediate attention recommended</div>';
+    if (data.requires_human_review) alerts.innerHTML += '<div class="alert-box warning"><strong>Human review required</strong></div>';
 
     const factors = document.getElementById('factors-list');
     factors.innerHTML = '';
@@ -1218,3 +1342,10 @@ function renderTrend(container, anonymizedId) {
             ${history.map((h, i) => `<circle class="trend-dot" cx="${x(i)}" cy="${y(h.score)}" r="3.5" fill="${levelColor(h.level)}"/>`).join('')}
         </svg>`;
 }
+
+// ── Utilities ─────────────────────────────────────────────────────────────
+function showError(msg) { const e = document.getElementById('error-display'); e.textContent = msg; e.style.display = 'block'; e.className = 'error-message'; e.scrollIntoView({ behavior: 'smooth' }); }
+function hideError() { document.getElementById('error-display').style.display = 'none'; }
+function hideResults() { document.getElementById('results-section').style.display = 'none'; }
+function showSuccess(msg) { const e = document.getElementById('error-display'); e.className = 'success-message'; e.textContent = msg; e.style.display = 'block'; setTimeout(() => { e.style.display = 'none'; }, 3000); }
+function showLoading(show) { document.getElementById('loading').style.display = show ? 'block' : 'none'; }

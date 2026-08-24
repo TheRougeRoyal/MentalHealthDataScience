@@ -88,7 +88,7 @@ _VALID_STATUSES = {"pending", "approved", "escalated", "closed"}
 async def get_review_queue_legacy(
     status_filter: Optional[str] = Query(None, alias="status_filter"),
     limit: int = 50,
-    auth: AuthResult = Depends(require_role("admin", "reviewer")),
+    auth: AuthResult = Depends(require_role("admin")),
 ):
     """Backward-compatible endpoint that delegates to GET /reviews."""
     return await _get_reviews(status_filter, limit, auth)
@@ -98,7 +98,7 @@ async def get_review_queue_legacy(
 async def list_reviews(
     status_filter: Optional[str] = Query(None, alias="status"),
     limit: int = 50,
-    auth: AuthResult = Depends(require_role("admin", "reviewer")),
+    auth: AuthResult = Depends(require_role("admin")),
 ):
     """List reviews, optionally filtered by status."""
     return await _get_reviews(status_filter, limit, auth)
@@ -140,7 +140,7 @@ async def _get_reviews(status_filter: Optional[str], limit: int, auth: AuthResul
 @router.get("/{review_id}")
 async def get_review(
     review_id: str,
-    auth: AuthResult = Depends(require_role("admin", "reviewer")),
+    auth: AuthResult = Depends(require_role("admin")),
 ):
     """Get a single review with its linked screening context."""
     db = get_firestore_client()
@@ -162,7 +162,7 @@ async def get_review(
 async def update_review(
     review_id: str,
     body: UpdateReviewRequest,
-    auth: AuthResult = Depends(require_role("admin", "reviewer")),
+    auth: AuthResult = Depends(require_role("admin")),
 ):
     """Update a review's status and/or notes."""
     db = get_firestore_client()
@@ -204,7 +204,7 @@ async def update_review(
 async def assign_reviewer(
     review_id: str,
     body: AssignRequest,
-    auth: AuthResult = Depends(require_role("admin", "reviewer")),
+    auth: AuthResult = Depends(require_role("admin")),
 ):
     """Assign a reviewer to a review (sets status to 'approved')."""
     db = get_firestore_client()
@@ -237,7 +237,7 @@ async def assign_reviewer(
 async def add_comment(
     review_id: str,
     body: CommentRequest,
-    auth: AuthResult = Depends(require_role("admin", "reviewer")),
+    auth: AuthResult = Depends(require_role("admin")),
 ):
     """Append a note to a review."""
     db = get_firestore_client()
@@ -270,7 +270,7 @@ async def add_comment(
 async def close_review(
     review_id: str,
     body: Optional[CommentRequest] = None,
-    auth: AuthResult = Depends(require_role("admin", "reviewer")),
+    auth: AuthResult = Depends(require_role("admin")),
 ):
     """Close a review, optionally adding a final note."""
     db = get_firestore_client()
