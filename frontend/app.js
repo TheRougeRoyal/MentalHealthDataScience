@@ -291,8 +291,90 @@ async function fetchMe() {
                 avatar.src = u.photo_url;
                 avatar.style.display = '';
             }
+            return u;
         }
     } catch (_) {}
+    return null;
+}
+
+// Profile pages share the authentication bootstrap with the other workspace
+// pages, but also need to reveal and populate their account form after login.
+function initProfile() {
+    const profile = document.getElementById('profile-content');
+    if (profile && !_fbUser) profile.style.display = 'none';
+}
+
+async function loadProfilePage() {
+    const profile = document.getElementById('profile-content');
+    if (!profile || !_fbUser) return;
+
+    const loading = document.getElementById('loading');
+    if (loading) loading.style.display = '';
+    try {
+        const r = await fetch(`${API_BASE_URL}/auth/me`, { headers: await authHeaders() });
+        if (!r.ok) throw new Error(`HTTP ${r.status}`);
+        const user = await r.json();
+        profile.style.display = '';
+
+        const values = {
+            'profile-display-name': user.display_name || user.email || user.uid || '—',
+            'profile-email': user.email || '—',
+            'profile-display-name-input': user.display_name || '',
+            'profile-job-title': user.job_title || '',
+            'profile-organization': user.organization || '',
+            'profile-location': user.location || '',
+            'profile-phone': user.phone || '',
+            'profile-website': user.website || '',
+            'profile-bio': user.bio || '',
+            'profile-stat-screenings': user.screenings_count ?? '—',
+            'profile-stat-highrisk': user.high_risk_count ?? '—',
+        };
+        Object.entries(values).forEach(([id, value]) => {
+            const el = document.getElementById(id);
+            if (!el) return;
+            if ('value' in el) el.value = value;
+            else el.textContent = value;
+        });
+
+        const role = document.getElementById('profile-role-badge');
+        if (role) role.textContent = user.role || 'user';
+        const provider = document.getElementById('profile-provider-badge');
+        if (provider) provider.textContent = user.provider || '—';
+
+        const avatar = document.getElementById('profile-avatar');
+        const fallback = document.getElementById('profile-avatar-fallback');
+        if (user.photo_url) {
+            avatar.src = user.photo_url;
+            avatar.style.display = '';
+            if (fallback) fallback.style.display = 'none';
+        }
+    } catch (error) {
+        showError(`Could not load your profile: ${error.message}`);
+    } finally {
+        if (loading) loading.style.display = 'none';
+    }
+}
+
+async function saveProfile() {
+    if (!_fbUser) return showError('Please sign in before saving your profile.');
+    const fields = ['display-name', 'job-title', 'organization', 'location', 'phone', 'website', 'bio'];
+    const body = {};
+    fields.forEach((name) => {
+        const el = document.getElementById(`profile-${name}-input`) || document.getElementById(`profile-${name}`);
+        if (el) body[name.replace('-', '_')] = el.value.trim();
+    });
+    try {
+        const r = await fetch(`${API_BASE_URL}/auth/me`, {
+            method: 'PATCH',
+            headers: await authHeaders(),
+            body: JSON.stringify(body),
+        });
+        if (!r.ok) throw new Error((await r.json().catch(() => ({}))).detail || `HTTP ${r.status}`);
+        await loadProfilePage();
+        showSuccess('Profile saved.');
+    } catch (error) {
+        showError(`Could not save your profile: ${error.message}`);
+    }
 }
 
 // ── Role-aware UI gating ───────────────────────────────────────────────────
