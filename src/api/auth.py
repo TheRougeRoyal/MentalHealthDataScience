@@ -2,31 +2,30 @@
 
 - Frontend sends Firebase ID token in ``Authorization: Bearer <token>``
 - Backend verifies with ``firebase_admin.auth.verify_id_token()``
-- User role fetched from Firestore ``users/{uid}`` collection
-- Role checks happen server-side only
+- Role is derived exclusively from Firebase custom claims (``admin`` claim)
+- Role checks happen server-side only via ``require_role``
+
+Profile endpoints (GET/PATCH /auth/me) live in ``src.api.profile``.
 """
 
 from __future__ import annotations
 
 import logging
 import os
-from typing import Optional
 
-from firebase_admin import firestore as _fs
+from firebase_admin.auth import RevokedIdTokenError, UserDisabledError
 from fastapi import APIRouter, Depends, HTTPException, Request, status
 from pydantic import BaseModel
-
-from src.firebase_admin import get_firestore_client
 
 logger = logging.getLogger(__name__)
 
 
 # ---------------------------------------------------------------------------
-# Pydantic models
+# Pydantic model — injected into every authenticated endpoint
 # ---------------------------------------------------------------------------
 
 class AuthResult(BaseModel):
-    """Injected into every authenticated endpoint."""
+    """Carries the verified identity and role for an authenticated request."""
     authenticated: bool
     user_id: str | None = None
     email: str | None = None
@@ -38,64 +37,44 @@ class AuthResult(BaseModel):
     error: str | None = None
 
 
-class UserInfo(BaseModel):
-    uid: str
-    email: str | None = None
-    role: str
-    display_name: str | None = None
-    photo_url: str | None = None
-    provider: str | None = None
-    bio: str | None = None
-    organization: str | None = None
-    job_title: str | None = None
-    phone: str | None = None
-    location: str | None = None
-    website: str | None = None
+# ---------------------------------------------------------------------------
+# Internal helpers
+# ---------------------------------------------------------------------------
 
-
-class UpdateProfileRequest(BaseModel):
-    display_name: str | None = None
-    bio: str | None = None
-    organization: str | None = None
-    job_title: str | None = None
-    phone: str | None = None
-    location: str | None = None
-    website: str | None = None
-
-
-def _user_info_from_doc(uid: str, auth: AuthResult, user_data: dict | None) -> UserInfo:
-    data = user_data or {}
-    return UserInfo(
-        uid=uid,
-        email=auth.email,
-        role=auth.role or "user",
-        display_name=data.get("display_name", auth.display_name),
-        photo_url=data.get("photo_url", auth.photo_url),
-        provider=data.get("provider", auth.provider),
-        bio=data.get("bio"),
-        organization=data.get("organization"),
-        job_title=data.get("job_title"),
-        phone=data.get("phone"),
-        location=data.get("location"),
-        website=data.get("website"),
+def _dev_bypass_active() -> bool:
+    """Return True only when BOTH guard variables are explicitly set for development."""
+    return (
+        os.environ.get("ALLOW_DEV_AUTH_BYPASS", "").lower() == "true"
+        and os.environ.get("ENV", "").lower() == "development"
     )
 
 
 # ---------------------------------------------------------------------------
-# FastAPI dependencies
+# FastAPI dependency — token verification
 # ---------------------------------------------------------------------------
 
 def get_current_user(request: Request) -> AuthResult:
     """Extract and verify the Firebase ID token from the Authorization header.
 
-    A development bypass is opt-in and must never be enabled by default.
+    Role is derived purely from Firebase custom claims (``admin`` claim).
+    No Firestore read occurs here — profile enrichment and first-login
+    provisioning happen lazily in GET /auth/me (see ``src.api.profile``).
+
+    Dev bypass requires BOTH ``ALLOW_DEV_AUTH_BYPASS=true`` AND
+    ``ENV=development``. The app startup guard in ``app.py`` refuses to start
+    if the bypass is armed without ``ENV=development``.
     """
-    from src.firebase_admin import verify_id_token, get_firestore_client
+    from src.firebase_admin import verify_id_token
 
     auth_header = request.headers.get("Authorization", "")
 
     if not auth_header.startswith("Bearer "):
-        if os.environ.get("ALLOW_DEV_AUTH_BYPASS", "").lower() == "true":
+        if _dev_bypass_active():
+            logger.warning(
+                "!!! DEV AUTH BYPASS ACTIVE — unauthenticated request granted admin access. "
+                "ALLOW_DEV_AUTH_BYPASS=true and ENV=development are both set. "
+                "NEVER deploy this configuration to production !!!"
+            )
             return AuthResult(
                 authenticated=True,
                 user_id="dev_user",
@@ -119,6 +98,12 @@ def get_current_user(request: Request) -> AuthResult:
 
     try:
         decoded = verify_id_token(token)
+    except (RevokedIdTokenError, UserDisabledError) as e:
+        logger.warning("Token rejected — revoked or disabled account: %s", e)
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Token has been revoked",
+        )
     except Exception as e:
         logger.warning("Token verification failed: %s", e)
         raise HTTPException(
@@ -144,35 +129,10 @@ def get_current_user(request: Request) -> AuthResult:
     # Firebase custom claims are the runtime source of truth. Email addresses
     # are identity metadata, never authorization credentials.
     is_admin = decoded.get("admin") is True or decoded.get("role") == "admin"
-    default_role = "admin" if is_admin else "user"
-    role = default_role
+    role = "admin" if is_admin else "user"
+    # stored_role in Firestore is always normalised to match this claim-derived
+    # value on first login (see _provision_new_user in src.api.profile).
     mfa_verified = bool(firebase_claims.get("sign_in_second_factor"))
-    try:
-        db = get_firestore_client()
-        user_doc = db.collection("users").document(uid).get()
-        if user_doc.exists:
-            user_data = user_doc.to_dict()
-            stored_role = user_data.get("role")
-            role = "admin" if is_admin else "user"
-            if stored_role != role:
-                db.collection("users").document(uid).update({"role": role})
-            display_name = user_data.get("display_name", display_name)
-            photo_url = user_data.get("photo_url", photo_url)
-        else:
-            # First login — auto-create user doc
-            new_user = {
-                "uid": uid,
-                "email": email,
-                "display_name": display_name,
-                "photo_url": photo_url,
-                "role": default_role,
-                "provider": provider,
-                "created_at": _fs.SERVER_TIMESTAMP,
-            }
-            db.collection("users").document(uid).set(new_user, merge=True)
-            logger.info("Created Firestore user doc for %s (role=%s, provider=%s)", uid, default_role, provider)
-    except Exception as e:
-        logger.error("Failed to fetch/create user doc: %s", e)
 
     return AuthResult(
         authenticated=True,
@@ -185,6 +145,10 @@ def get_current_user(request: Request) -> AuthResult:
         mfa_verified=mfa_verified,
     )
 
+
+# ---------------------------------------------------------------------------
+# Role enforcement dependency
+# ---------------------------------------------------------------------------
 
 def require_role(*allowed_roles: str):
     """Dependency that enforces role-based access.
@@ -200,14 +164,21 @@ def require_role(*allowed_roles: str):
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail=f"Role '{auth.role}' not allowed. Required: {', '.join(allowed_roles)}",
             )
-        if auth.role == "admin" and os.environ.get("REQUIRE_ADMIN_MFA", "true").lower() == "true" and not auth.mfa_verified:
-            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="MFA is required for administrator access")
+        if (
+            auth.role == "admin"
+            and os.environ.get("REQUIRE_ADMIN_MFA", "true").lower() == "true"
+            and not auth.mfa_verified
+        ):
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="MFA is required for administrator access",
+            )
         return auth
     return _checker
 
 
 # ---------------------------------------------------------------------------
-# Auth router
+# Auth router  (/auth/config only — /auth/me lives in src.api.profile)
 # ---------------------------------------------------------------------------
 
 router = APIRouter(prefix="/auth", tags=["Authentication"])
@@ -225,66 +196,3 @@ async def firebase_config():
         "appId": os.environ.get("FIREBASE_APP_ID", ""),
         "measurementId": os.environ.get("FIREBASE_MEASUREMENT_ID", ""),
     }
-
-
-@router.get("/me")
-async def me(auth: AuthResult = Depends(get_current_user)):
-    """Return the identity and profile of the currently authenticated user."""
-    uid = auth.user_id or ""
-    user_data: dict | None = None
-    try:
-        db = get_firestore_client()
-        if db is not None:
-            doc = db.collection("users").document(uid).get()
-            if doc.exists:
-                user_data = doc.to_dict()
-    except Exception as e:
-        logger.error("Failed to fetch user profile: %s", e)
-    return _user_info_from_doc(uid, auth, user_data)
-
-
-@router.patch("/me")
-async def update_me(
-    body: UpdateProfileRequest,
-    auth: AuthResult = Depends(get_current_user),
-):
-    """Update the current user's profile fields in Firestore."""
-    uid = auth.user_id or ""
-    if not uid:
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Not authenticated")
-
-    updates: dict = {}
-    for field in ("display_name", "bio", "organization", "job_title", "phone", "location", "website"):
-        value = getattr(body, field)
-        if value is not None:
-            cleaned = value.strip() if isinstance(value, str) else value
-            if field == "bio" and cleaned and len(cleaned) > 500:
-                raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Bio must be 500 characters or fewer")
-            updates[field] = cleaned or None
-
-    if not updates:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="No profile fields to update")
-
-    updates["updated_at"] = _fs.SERVER_TIMESTAMP
-
-    try:
-        db = get_firestore_client()
-        if db is None:
-            raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail="Profile storage unavailable")
-        db.collection("users").document(uid).set(updates, merge=True)
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.error("Failed to update user profile: %s", e)
-        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Failed to update profile")
-
-    if "display_name" in updates and updates["display_name"]:
-        try:
-            from firebase_admin import auth as firebase_auth
-            firebase_auth.update_user(uid, display_name=updates["display_name"])
-        except Exception as e:
-            logger.warning("Firebase Auth display_name sync failed: %s", e)
-
-    doc = db.collection("users").document(uid).get()
-    user_data = doc.to_dict() if doc.exists else updates
-    return _user_info_from_doc(uid, auth, user_data)

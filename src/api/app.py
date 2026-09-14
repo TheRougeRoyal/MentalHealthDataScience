@@ -23,6 +23,22 @@ logger = logging.getLogger(__name__)
 
 @asynccontextmanager
 async def lifespan(_app: FastAPI):
+    # Refuse to start if the dev auth bypass is armed outside of development.
+    # This catches misconfigured production deploys before any request is served.
+    bypass_on = os.environ.get("ALLOW_DEV_AUTH_BYPASS", "").lower() == "true"
+    env = os.environ.get("ENV", "").lower()
+    if bypass_on and env != "development":
+        raise RuntimeError(
+            "ALLOW_DEV_AUTH_BYPASS=true is set but ENV is not 'development' "
+            f"(ENV={env!r}). Refusing to start to prevent accidental auth bypass "
+            "in production."
+        )
+    if bypass_on:
+        logger.warning(
+            "!!! DEV AUTH BYPASS IS ARMED (ALLOW_DEV_AUTH_BYPASS=true, ENV=development). "
+            "Unauthenticated requests will be granted admin access. "
+            "NEVER run this configuration in production !!!"
+        )
     logger.info("Starting MHRAS API (Firebase backend)...")
     logger.info("API docs at /docs")
     yield
@@ -91,11 +107,13 @@ async def general_exception_handler(request: Request, exc: Exception):
 # ── Include routers ────────────────────────────────────────────────────────
 
 from src.api.auth import router as auth_router
+from src.api.profile import router as profile_router
 from src.api.reviews import router as reviews_router
 from src.api.endpoints import router as endpoints_router
 from src.api.admin import router as admin_router
 
 app.include_router(auth_router)
+app.include_router(profile_router)
 app.include_router(endpoints_router)
 app.include_router(admin_router)
 app.include_router(reviews_router)

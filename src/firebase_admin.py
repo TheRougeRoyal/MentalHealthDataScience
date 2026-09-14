@@ -44,7 +44,10 @@ def _init_app() -> firebase_admin.App | None:
         cred = credentials.Certificate(info)
     elif json_path and os.path.isfile(json_path):
         cred = credentials.Certificate(json_path)
-    elif os.environ.get("ALLOW_DEV_AUTH_BYPASS", "").lower() == "true":
+    elif (
+        os.environ.get("ALLOW_DEV_AUTH_BYPASS", "").lower() == "true"
+        and os.environ.get("ENV", "").lower() == "development"
+    ):
         # ponytail: dev mode — let the risk pipeline run without Firestore.
         logger.warning("Firebase credentials not configured; running without persistence (dev only).")
         global _db_disabled
@@ -76,10 +79,16 @@ def get_firestore_client() -> firestore.Client | None:
 def verify_id_token(token: str) -> dict:
     """Verify a Firebase ID token and return the decoded claims.
 
-    Raises ``firebase_admin.auth.InvalidIdTokenError`` on failure.
+    Passes ``check_revoked=True`` so revoked tokens (signed-out or deleted
+    users) are rejected immediately rather than remaining valid until expiry.
+
+    Raises:
+        ``firebase_admin.auth.RevokedIdTokenError`` – token was explicitly revoked.
+        ``firebase_admin.auth.UserDisabledError``   – account has been disabled.
+        ``firebase_admin.auth.InvalidIdTokenError`` – token is malformed/expired.
     """
     _init_app()
-    return auth.verify_id_token(token)
+    return auth.verify_id_token(token, check_revoked=True)
 
 
 def persistence_enabled() -> bool:

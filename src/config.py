@@ -6,24 +6,6 @@ from pydantic import Field, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
-class DatabaseConfig(BaseSettings):
-    """Database configuration"""
-    
-    host: str = Field(default="localhost", description="Database host")
-    port: int = Field(default=5432, description="Database port")
-    name: str = Field(default="mhras", description="Database name")
-    user: str = Field(default="mhras_user", description="Database user")
-    password: str = Field(default="", description="Database password")
-    pool_size: int = Field(default=10, description="Connection pool size")
-    
-    model_config = SettingsConfigDict(
-        env_prefix="DB_",
-        env_file=".env",
-        env_file_encoding="utf-8",
-        extra="ignore"
-    )
-
-
 class APIConfig(BaseSettings):
     """API configuration"""
     
@@ -208,7 +190,6 @@ class Settings(BaseSettings):
     debug: bool = Field(default=False, description="Debug mode")
     
     # Sub-configurations
-    database: DatabaseConfig = Field(default_factory=DatabaseConfig)
     api: APIConfig = Field(default_factory=APIConfig)
     ml: MLConfig = Field(default_factory=MLConfig)
     logging: LoggingConfig = Field(default_factory=LoggingConfig)
@@ -225,14 +206,6 @@ class Settings(BaseSettings):
         env_file_encoding="utf-8",
         extra="ignore"
     )
-    
-    @property
-    def DATABASE_URL(self) -> str:
-        """Construct PostgreSQL connection URL from database config."""
-        return (
-            f"postgresql://{self.database.user}:{self.database.password}"
-            f"@{self.database.host}:{self.database.port}/{self.database.name}"
-        )
 
 
 # Global settings instance

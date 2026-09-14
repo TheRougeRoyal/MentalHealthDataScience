@@ -7,6 +7,8 @@ import pytest
 from fastapi.testclient import TestClient
 
 os.environ.setdefault("ENVIRONMENT", "development")
+os.environ.setdefault("SECURITY_JWT_SECRET", "test-jwt-secret-for-tests-only")
+os.environ.setdefault("SECURITY_ANONYMIZATION_SALT", "test-salt-for-tests-only")
 if not os.environ.get("SECURITY_DATA_ENCRYPTION_KEY"):
     os.environ["SECURITY_DATA_ENCRYPTION_KEY"] = "ZAeWmizAsJdqNlhw3dW-rfgUh6F-8aVfqeMbIGrTBks="
 
